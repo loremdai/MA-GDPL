@@ -15,6 +15,7 @@ from controller import Controller
 from agenda import UserAgenda
 from rule import SystemRule
 
+##### 预训练区 #####
 def worker_policy_sys(args, manager, config):
     init_logging_handler(args.log_dir, '_policy_sys')
     agent = Policy(None, args, manager, config, 0, 'sys', True)
