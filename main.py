@@ -94,13 +94,12 @@ if __name__ == '__main__':
         processes.append(mp.Process(target=worker_policy_sys, args=process_args))
         # 预训练：用户智能体
         processes.append(mp.Process(target=worker_policy_usr, args=process_args))
-        # 预训练：RewardEstimator
-        processes.append(mp.Process(target=worker_estimator, args=process_args))
         for p in processes:
             p.start()
-        
         for p in processes:
             p.join()
+        # 预训练：RewardEstimator
+        worker_estimator(args, manager, config, make_env)
     # 测试模式
     elif args.test:
         logging.debug('test')
