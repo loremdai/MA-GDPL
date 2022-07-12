@@ -172,7 +172,7 @@ class Policy(object):
                 a_loss = 0.
         
         if (epoch+1) % self.save_per_epoch == 0:
-            self.save(self.save_dir, epoch)
+            self.save(self.save_dir, epoch, True)
         self.policy.eval()
     def imit_test(self, epoch, best):
         """
@@ -188,7 +188,7 @@ class Policy(object):
         if a_loss < best:
             logging.info('<<dialog policy {}>> best model saved'.format(self.character))
             best = a_loss
-            self.save(self.save_dir, 'best')
+            self.save(self.save_dir, 'best', True)
             
         a_loss = 0.
         for i, data in enumerate(self.data_test):
@@ -234,7 +234,7 @@ class Policy(object):
                 self.vnet_optim.step()
 
             value_loss /= optim_chunk_num
-            logging.debug('<<dialog policy>> epoch {}, iteration {}, loss {}'.format(epoch, i, value_loss))
+            logging.debug('<<dialog policy {}>> epoch {}, iteration {}, loss {}'.format("Reward Estimator", epoch, i, value_loss))
 
         if value_loss < best:
             logging.info('<<dialog policy>> best model saved')
@@ -360,7 +360,7 @@ class Policy(object):
 
         # 此处修改，追加保存value和RE
         if not rl_only:
-            self.rewarder.save_irl(directory, epoch)
+            self.rewarder.save_irl(directory, epoch)    # 调用save_irl函数保存
         torch.save(self.vnet.state_dict(), directory + '/' + str(epoch) + '_vnet.mdl')
         torch.save(self.policy.state_dict(), directory + '/' + str(epoch) + '_pol.mdl')
 
