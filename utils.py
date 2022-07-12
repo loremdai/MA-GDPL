@@ -24,6 +24,8 @@ def get_parser():
     parser.add_argument('--test_case', type=int, default=1000, help='Number of test cases')
     parser.add_argument('--save_per_epoch', type=int, default=4, help="Save model every XXX epoches")
     parser.add_argument('--print_per_batch', type=int, default=200, help="Print log every XXX batches")
+    # 下面一项为新增项
+    parser.add_argument('--update_round', type=int, default=5, help='Epoch num for inner loop of PPO')
 
     parser.add_argument('--epoch', type=int, default=48, help='Max number of epoch')
     parser.add_argument('--process', type=int, default=8, help='Process number')
