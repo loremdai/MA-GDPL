@@ -142,7 +142,7 @@ class Policy(object):
         self.writer = SummaryWriter()
 
     """
-    预训练（模仿学习-行为克隆）模块
+    预训练系统/用户智能体模块
     """
     # 计算损失，该函数只在预训练模块中被调用
     def policy_loop(self, data):
@@ -151,8 +151,7 @@ class Policy(object):
         
         loss_a = self.multi_entropy_loss(a_weights, target_a)
         return loss_a
-
-    # 预训练智能体（以下2个函数只在main.py预训练区被调用）
+    # 预训练智能体
     def imitating(self, epoch):
         """
         pretrain the policy by simple imitation learning (behavioral cloning)
@@ -174,6 +173,7 @@ class Policy(object):
         if (epoch+1) % self.save_per_epoch == 0:
             self.save(self.save_dir, epoch, True)
         self.policy.eval()
+    # 测试智能体
     def imit_test(self, epoch, best):
         """
         provide an unbiased evaluation of the policy fit on the training dataset
@@ -200,7 +200,11 @@ class Policy(object):
         self.writer.add_scalar('pretrain/dialogue_policy_{}/test'.format(self.character), a_loss, epoch)
         return best
 
-    # 预训练RewardEstimator
+
+    """
+    预训练RewardEstimator模块
+    """
+    # 预训练价值网络
     def imit_value(self, epoch, batchsz, best):
         """
         预训练价值函数，返回最好的value_loss
@@ -246,9 +250,11 @@ class Policy(object):
         self.vnet.eval()  # 关闭训练模式
 
         return best  # 返回最佳（最小）损失
+    # 预训练RE（逆强化学习）
     def train_irl(self, epoch, batchsz):
         batch = self.sample(batchsz)
         self.rewarder.train_irl(batch, epoch)
+    # 测试RE
     def test_irl(self, epoch, batchsz, best):
         batch = self.sample(batchsz)
         best = self.rewarder.test_irl(batch, epoch, best)
