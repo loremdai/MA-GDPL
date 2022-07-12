@@ -33,8 +33,12 @@ def get_parser():
     parser.add_argument('--policy_weight_usr', type=float, default=4, help='Pos weight on user policy pretraining')
     parser.add_argument('--lr_policy', type=float, default=1e-3, help='Learning rate of dialog policy')
     parser.add_argument('--lr_vnet', type=float, default=3e-5, help='Learning rate of value network')
+    # 下面一项为新增项
+    parser.add_argument('--lr_irl', type=float, default=1e-3, help='Learning rate of reward estimator')
     parser.add_argument('--weight_decay', type=float, default=1e-5, help='Weight decay (L2 penalty)')
     parser.add_argument('--gamma', type=float, default=0.99, help='Discounted factor')
+    # 下面一项为新增项
+    parser.add_argument('--tau', type=float, default=0.95, help='Generalized advantage estimation')
     parser.add_argument('--clip', type=float, default=10, help='Gradient clipping')
     parser.add_argument('--interval', type=int, default=400, help='Update interval of target network')
 
