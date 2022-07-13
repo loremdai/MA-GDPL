@@ -38,7 +38,6 @@ def get_parser():
     # 下面3项为新增项
     parser.add_argument('--lr_irl', type=float, default=1e-3, help='Learning rate of reward estimator')
     parser.add_argument('--anneal', type=int, default=5000, help='Max steps for annealing')
-    parser.add_argument('--clip', type=float, default=0.02, help='Clipping parameter on WGAN')
     parser.add_argument('--weight_decay', type=float, default=1e-5, help='Weight decay (L2 penalty)')
     parser.add_argument('--gamma', type=float, default=0.99, help='Discounted factor')
 
