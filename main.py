@@ -93,7 +93,7 @@ if __name__ == '__main__':
         process_args = (args, manager, config)
 
         # 预训练：RewardEstimator
-        env = make_env(args.data_dir, config)
+        env = make_env_agenda(args.data_dir, config)
         worker_estimator(args, manager, config, env)
         # 预训练：系统智能体
         processes.append(mp.Process(target=worker_policy_sys, args=process_args))
