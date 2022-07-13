@@ -37,7 +37,7 @@ def worker_policy_usr(args, manager, config):
 # 新增项
 def worker_estimator(args, manager, config, make_env):
     init_logging_handler(args.log_dir, '_estimator')
-    agent = Policy(None, args, manager, config, args.process, 'sys', pre_irl=True)
+    agent = Policy(make_env, args, manager, config, args.process, 'sys', pre_irl=True)
     agent.load(args.save_dir+'/best')
 
     best0, best1 = float('inf'), float('inf')
@@ -50,9 +50,11 @@ def worker_estimator(args, manager, config, make_env):
 """
 环境区
 """
+# 在训练模式和测试模式中被调用
 def make_env(data_dir, config):
     controller = Controller(data_dir, config)
     return controller
+# 以下2个函数只在测试模式中被调用
 def make_env_rule(data_dir, config):
     env = SystemRule(data_dir, config)
     return env
@@ -90,6 +92,8 @@ if __name__ == '__main__':
         processes = []
         process_args = (args, manager, config)
 
+        # 预训练：RewardEstimator
+        worker_estimator(args, manager, config, make_env_agenda)
         # 预训练：系统智能体
         processes.append(mp.Process(target=worker_policy_sys, args=process_args))
         # 预训练：用户智能体
@@ -98,8 +102,7 @@ if __name__ == '__main__':
             p.start()
         for p in processes:
             p.join()
-        # 预训练：RewardEstimator
-        worker_estimator(args, manager, config, make_env)
+
     # 测试模式
     elif args.test:
         logging.debug('test')
