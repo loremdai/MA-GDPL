@@ -94,7 +94,8 @@ class MultiWozConfig(Config):
         self.hs_dim = 100
         self.ha_dim = 50
         self.hv_dim = 50 # for value function
-        
+        self.hi_dim = 50 # for airl module  新增项，RE用
+
         # da to db
         self.mapping = {'restaurant': {'addr': 'address', 'area': 'area', 'food': 'food', 'name': 'name', 'phone': 'phone', 'post': 'postcode', 'price': 'pricerange'},
                         'hotel': {'addr': 'address', 'area': 'area', 'internet': 'internet', 'parking': 'parking', 'name': 'name', 'phone': 'phone', 'post': 'postcode', 'price': 'pricerange', 'stars': 'stars', 'type': 'type'},
