@@ -93,7 +93,7 @@ if __name__ == '__main__':
         process_args = (args, manager, config)
 
         # 预训练：RewardEstimator
-        worker_estimator(args, manager, config, make_env_agenda)
+        worker_estimator(args, manager, config, make_env)
         # 预训练：系统智能体
         processes.append(mp.Process(target=worker_policy_sys, args=process_args))
         # 预训练：用户智能体
