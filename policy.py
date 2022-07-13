@@ -102,7 +102,7 @@ class Policy(object):
         # initialize envs for each process
         self.env_list = []
         for _ in range(process_num):
-            self.env_list.append(env_cls())
+            self.env_list.append(env_cls(args.data_dir, cfg))
 
         # 此处新增价值网络
         self.policy = MultiDiscretePolicy(cfg, character).to(device=DEVICE)
