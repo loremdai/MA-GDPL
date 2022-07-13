@@ -37,7 +37,7 @@ def worker_policy_usr(args, manager, config):
 # 新增项
 def worker_estimator(args, manager, config, make_env):
     init_logging_handler(args.log_dir, '_estimator')
-    agent = Policy(make_env, args, manager, config, args.process, 'sys', pre_irl=True)
+    agent = Policy(None, args, manager, config, args.process, 'sys', pre_irl=True)
     agent.load(args.save_dir+'/best')
 
     best0, best1 = float('inf'), float('inf')
