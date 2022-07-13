@@ -27,7 +27,7 @@ class RewardEstimator(object):
         self.optim_batchsz = args.batchsz
         self.irl.eval()
 
-        db = DBQuery(args.data_dir)
+        db = DBQuery(args.data_dir, config)
 
         # 预训练模式，切分3个数据集后放入迭代器中。
         if pretrain:
