@@ -471,7 +471,19 @@ class DataManager():
         
         logging.debug('finish loading {}'.format(part))
         return dataloader_sys, dataloader_usr, dataloader_global
-        
+
+    def create_dataset_irl(self, part, batchsz, cfg, db):
+        assert part in['train','valid','test']
+        logging.debug('start loading {}'.format(part))
+
+        file_dir = self.data_dir_new + '/' + part + '_sys.pt'
+
+        s, a, next_s = torch.load(file_dir)
+        dataset = DatasetIrl(s, a, next_s)
+        dataloader = data.DataLoader(dataset, batchsz, True)
+        logging.debug('finish loading irl {}'.format(part))
+        return dataloader
+
 
 class Dataset_Policy(data.Dataset):
     def __init__(self, s, a):
@@ -524,5 +536,21 @@ class Dataset_Vnet_G(data.Dataset):
         t = self.t[index]
         return s_usr, s_sys, r, next_s_usr, next_s_sys, t
     
+    def __len__(self):
+        return self.num_total
+
+class DatasetIrl(data.Dataset):
+    def __init__(self, s_s, a_s, next_s_s):
+        self.s_s = s_s
+        self.a_s = a_s
+        self.next_s_s = next_s_s
+        self.num_total = len(s_s)
+
+    def __getitem__(self, index):
+        s = self.s_s[index]
+        a = self.a_s[index]
+        next_s = self.next_s_s[index]
+        return s, a, next_s
+
     def __len__(self):
         return self.num_total
