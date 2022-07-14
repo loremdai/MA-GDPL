@@ -476,7 +476,7 @@ class DataManager():
         assert part in['train','valid','test']
         logging.debug('start loading {}'.format(part))
 
-        file_dir = self.data_dir_new + '/' + part + '_sys.pt'
+        file_dir = self.data_dir_new + '/' + part + '.pt'
 
         s, a, next_s = torch.load(file_dir)
         dataset = DatasetIrl(s, a, next_s)
