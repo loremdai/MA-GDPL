@@ -6,15 +6,17 @@ import sys
 import time
 import logging
 from utils import get_parser, init_logging_handler
-from datamanager import DataManager
-from config import MultiWozConfig
 from torch import multiprocessing as mp
+
 from policy import Policy
 from learner import Learner
+
+from config import MultiWozConfig
 from controller import Controller
+
 from agenda import UserAgenda
 from rule import SystemRule
-
+from datamanager import DataManager
 """
 预训练区
 """

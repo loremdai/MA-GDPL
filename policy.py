@@ -217,7 +217,7 @@ class Policy(object):
         mask = torch.Tensor(np.stack(batch.mask)).to(device=DEVICE)
         batchsz = s.size(0)
 
-        v = self.vnet(s, 'usr').squeeze(-1).detach()
+        v = self.vnet(s, 'sys').squeeze(-1).detach()
         log_pi_old_sa = self.policy.get_log_prob(s, a).detach()
         r = self.rewarder.estimate(s, a, next_s, log_pi_old_sa).detach()
         A_sa, v_target = self.est_adv(r, v, mask)
@@ -231,7 +231,7 @@ class Policy(object):
             value_loss = 0.
             for v_target_b, s_b in zip(v_target_shuf, s_shuf):
                 self.vnet_optim.zero_grad()
-                v_b = self.vnet(s_b, 'usr').squeeze(-1)
+                v_b = self.vnet(s_b, 'sys').squeeze(-1)
                 loss = (v_b - v_target_b).pow(2).mean()
                 value_loss += loss.item()
                 loss.backward()

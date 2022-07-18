@@ -476,9 +476,15 @@ class DataManager():
         assert part in['train','valid','test']
         logging.debug('start loading {}'.format(part))
 
-        file_dir = self.data_dir_new + '/' + part + '.pt'
+        file_dir = self.data_dir_new + '/' + part + '_sys.pt'
 
-        s, a, next_s = torch.load(file_dir)
+        s, a, _, next_s, *_ = torch.load(file_dir)
+        new_s, new_a, new_next_s = [], [], []
+        for state, action, next_state in zip(s, a, next_s):
+            if action.nonzero().size(0):
+                new_s.append(state)
+                new_a.append(action)
+                new_next_s.append(next_state)
         dataset = DatasetIrl(s, a, next_s)
         dataloader = data.DataLoader(dataset, batchsz, True)
         logging.debug('finish loading irl {}'.format(part))
