@@ -104,7 +104,7 @@ if __name__ == '__main__':
 
         # 预训练：RewardEstimator  待修改！！！
         processes.append(mp.Process(target=worker_estimator_sys, args=re_process_args))
-        processes.append(mp.Process(target=worker_estimator_usr, args=re_process_args))
+        # processes.append(mp.Process(target=worker_estimator_usr, args=re_process_args))
         # worker_estimator_sys(args, manager, config, make_env_agenda)
         # worker_estimator_usr(args, manager, config, make_env_agenda)
 
