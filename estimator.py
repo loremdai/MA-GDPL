@@ -217,13 +217,13 @@ class RewardEstimator(object):
 
         # 如果为训练模式，则记录训练结果
         if backward:
-            logging.debug('<<reward estimator>> epoch {}, loss_real:{}, loss_gen:{}'.format(
-                epoch, real_loss, gen_loss))
+            logging.debug('<<reward estimator {}>> test, epoch {}, loss_real:{}, loss_gen:{}'.format(
+                self.character, epoch, real_loss, gen_loss))
             self.irl.eval()
         # 否则即为测试模式，记录验证集结果，保存最佳模型
         else:
-            logging.debug('<<reward estimator>> validation, epoch {}, loss_real:{}, loss_gen:{}'.format(
-                epoch, real_loss, gen_loss))
+            logging.debug('<<reward estimator {}>> test, epoch {}, loss_real:{}, loss_gen:{}'.format(
+                self.character, epoch, real_loss, gen_loss))
             loss = real_loss + gen_loss
             if loss < best:
                 logging.info('<<reward estimator>> best model saved')
@@ -237,8 +237,8 @@ class RewardEstimator(object):
         infer the reward of state action pair with the estimator
         """
         weight = self.irl(s, a.float(), next_s)  # weight = f(s, a, s')
-        logging.debug('<<reward estimator>> weight {}'.format(weight.mean().item()))
-        logging.debug('<<reward estimator>> log pi {}'.format(log_pi.mean().item()))
+        logging.debug('<<reward estimator {}>> weight {}'.format(self.character, weight.mean().item()))
+        logging.debug('<<reward estimator {}>> log pi {}'.format(self.character, log_pi.mean().item()))
         # see AIRL paper
         # r = f(s, a, s') - log_p(a|s)
         reward = (weight - log_pi).squeeze(-1)
