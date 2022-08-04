@@ -106,8 +106,8 @@ class RewardEstimator(object):
                 p.data.clamp_(-self.weight_cliping_limit, self.weight_cliping_limit)
         real_loss /= turns
         gen_loss /= turns
-        logging.debug('<<reward estimator>> epoch {}, loss_real:{}, loss_gen:{}'.format(
-            epoch, real_loss, gen_loss))
+        logging.debug('<<reward estimator {}>> epoch {}, loss_real:{}, loss_gen:{}'.format(
+            self.character, epoch, real_loss, gen_loss))
         if (epoch + 1) % self.save_per_epoch == 0:
             self.save_irl(self.save_dir, epoch)
         self.irl.eval()
@@ -139,8 +139,8 @@ class RewardEstimator(object):
             gen_loss += loss_gen.item()
         real_loss /= turns
         gen_loss /= turns
-        logging.debug('<<reward estimator>> validation, epoch {}, loss_real:{}, loss_gen:{}'.format(
-            epoch, real_loss, gen_loss))
+        logging.debug('<<reward estimator {}>> validation, epoch {}, loss_real:{}, loss_gen:{}'.format(
+            self.character, epoch, real_loss, gen_loss))
         loss = real_loss + gen_loss
         if loss < best:
             logging.info('<<reward estimator>> best model saved')
@@ -160,8 +160,8 @@ class RewardEstimator(object):
             gen_loss += loss_gen.item()
         real_loss /= turns
         gen_loss /= turns
-        logging.debug('<<reward estimator>> test, epoch {}, loss_real:{}, loss_gen:{}'.format(
-            epoch, real_loss, gen_loss))
+        logging.debug('<<reward estimator {}>> test, epoch {}, loss_real:{}, loss_gen:{}'.format(
+            self.character, epoch, real_loss, gen_loss))
         return best
 
     # 更新模型
