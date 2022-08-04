@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import numpy as np
 
 from collections import namedtuple
 import random
@@ -93,7 +92,7 @@ class MultiDiscretePolicy(nn.Module):
         return log_prob.sum(-1, keepdim=True)
 
 """
-下面定义价值(Value)的网络结构
+下面定义混合价值(Hybrid Value)的网络结构
 """
 class HybridValue(nn.Module):
     def __init__(self, cfg):
@@ -135,10 +134,50 @@ class HybridValue(nn.Module):
         return v.squeeze(-1)
 
 """
+下面定义逆强化学习网络结构，将reward estimator f(s,a)分为g(s,a)和h(s)。其中g()和h()为单层感知机结构。
+"""
+class AIRL(nn.Module):
+    """
+    label: 1 for real, 0 for generated
+    """
+
+    def __init__(self, cfg, gamma, character='sys'):
+        super(AIRL, self).__init__()
+
+        self.gamma = gamma
+        if character == 'sys':
+            self.g = nn.Sequential(nn.Linear(cfg.s_dim + cfg.a_dim, cfg.hi_dim),
+                                   nn.ReLU(),
+                                   nn.Linear(cfg.hi_dim, 1))
+            self.h = nn.Sequential(nn.Linear(cfg.s_dim, cfg.hi_dim),
+                                   nn.ReLU(),
+                                   nn.Linear(cfg.hi_dim, 1))
+        elif character == 'usr':
+            self.g = nn.Sequential(nn.Linear(cfg.s_dim_usr + cfg.a_dim_usr, cfg.hi_dim),
+                                   nn.ReLU(),
+                                   nn.Linear(cfg.hi_dim, 1))
+            self.h = nn.Sequential(nn.Linear(cfg.s_dim_usr, cfg.hi_dim),
+                                   nn.ReLU(),
+                                   nn.Linear(cfg.hi_dim, 1))
+        else:
+            raise NotImplementedError('Unknown character {}'.format(character))
+
+    def forward(self, s, a, next_s):
+        """
+        :param s: [b, s_dim]
+        :param a: [b, a_dim]
+        :param next_s: [b, s_dim]
+        :return:  [b, 1]
+        """
+        # g(s,a) + γ * h(s') - h(s)
+        weights = self.g(torch.cat([s, a], -1)) + self.gamma * self.h(next_s) - self.h(s)
+        return weights
+
+
+"""
 下面定义记忆（回放缓存），经验采用元组存储，缓存采用列表结构
 """
 Transition = namedtuple('Transition', ('state', 'action', 'mask', 'next_state'))
-
 class Memory(object):
 
     def __init__(self):

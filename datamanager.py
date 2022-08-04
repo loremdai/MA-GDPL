@@ -472,11 +472,16 @@ class DataManager():
         logging.debug('finish loading {}'.format(part))
         return dataloader_sys, dataloader_usr, dataloader_global
 
-    def create_dataset_irl(self, part, batchsz, cfg, db):
+    def create_dataset_irl(self, part, batchsz, cfg, db, character='sys'):
         assert part in['train','valid','test']
         logging.debug('start loading {}'.format(part))
 
-        file_dir = self.data_dir_new + '/' + part + '_sys.pt'
+        if character == 'sys':
+            file_dir = self.data_dir_new + '/' + part + '_sys.pt'
+        elif character == 'usr':
+            file_dir = self.data_dir_new + '/' + part + '_usr.pt'
+        else:
+            raise NotImplementedError('Unknown character {}'.format(character))
 
         s, a, _, next_s, *_ = torch.load(file_dir)
         new_s, new_a, new_next_s = [], [], []
@@ -487,6 +492,7 @@ class DataManager():
                 new_next_s.append(next_state)
         dataset = DatasetIrl(s, a, next_s)
         dataloader = data.DataLoader(dataset, batchsz, True)
+
         logging.debug('finish loading irl {}'.format(part))
         return dataloader
 

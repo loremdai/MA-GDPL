@@ -12,14 +12,14 @@ from torch import optim
 from torch import multiprocessing as mp
 from torch.utils.tensorboard import SummaryWriter
 
-from utils import state_vectorize, to_device
+from utils import state_vectorize, state_vectorize_user, to_device
 from evaluator import MultiWozEvaluator
 from estimator import RewardEstimator
 from rlmodule import MultiDiscretePolicy, HybridValue, Memory, Transition
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
+# 与环境交互，产生模拟经验。
 def sampler(pid, queue, evt, env, policy, batchsz):
     """
     This is a sampler function, and it will be called by multiprocess.Process to sample data from environment by multiple
@@ -99,15 +99,15 @@ class Policy(object):
         self.process_num = process_num
         self.character = character
 
-        # initialize envs for each process
+        # 为每个进程初始化环境。
         self.env_list = []
         for _ in range(process_num):
             self.env_list.append(env_cls(args.data_dir, cfg))
 
-        # 此处新增价值网络
+        # 实例化策略和混合价值网络。
         self.policy = MultiDiscretePolicy(cfg, character).to(device=DEVICE)
-        self.vnet = HybridValue(cfg).to(device=DEVICE)
 
+        # 若为预训练模式：
         if pre:
             self.print_per_batch = args.print_per_batch
             from dbquery import DBQuery
@@ -123,22 +123,21 @@ class Policy(object):
                 raise Exception('Unknown character')
             self.multi_entropy_loss = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
         else:
-            # 此处添加reward estimator
-            self.rewarder = RewardEstimator(args, manager, cfg, pretrain=pre_irl, inference=infer)
+            # estimator.py已包含关于预训练模式的处理以及优化器的配置。
+            self.rewarder = RewardEstimator(args, manager, cfg, character, pretrain=pre_irl, inference=infer)
             self.evaluator = MultiWozEvaluator(args.data_dir)
 
-        # 下面新增若干项（均在imit_value中被调用）
+        # 超参数设置：
         self.save_dir = args.save_dir + '/' + character if pre else args.save_dir
         self.save_per_epoch = args.save_per_epoch
         self.optim_batchsz = args.batchsz
-        self.update_round = args.update_round   # Epoch num for inner loop of PPO
-        self.policy.eval()
-        self.vnet.eval()
-
-        self.tau = args.tau  # GAE广义优势估计超参数lambda（此处用tau）
         self.gamma = args.gamma
-        self.policy_optim = optim.RMSprop(self.policy.parameters(), lr=args.lr_policy, weight_decay=args.weight_decay)
-        self.vnet_optim = optim.Adam(self.vnet.parameters(), lr=args.lr_vnet)
+        self.process_num = process_num
+
+        # 优化器设置：
+        self.policy_optim = optim.RMSprop(self.policy.parameters(), lr=args.lr_policy)
+        self.policy.eval()
+
         self.writer = SummaryWriter()
 
     """
@@ -148,7 +147,6 @@ class Policy(object):
     def policy_loop(self, data):
         s, target_a = to_device(data)
         a_weights = self.policy(s)
-        
         loss_a = self.multi_entropy_loss(a_weights, target_a)
         return loss_a
     # 预训练智能体
@@ -204,52 +202,6 @@ class Policy(object):
     """
     预训练RewardEstimator模块
     """
-    # 预训练价值网络
-    def imit_value(self, epoch, batchsz, best):
-        """
-        预训练价值函数，返回最好的value_loss
-        """
-        self.vnet.train()
-        batch = self.sample(batchsz)
-        s = torch.from_numpy(np.stack(batch.state)).to(device=DEVICE)
-        a = torch.from_numpy(np.stack(batch.action)).to(device=DEVICE)
-        next_s = torch.from_numpy(np.stack(batch.next_state)).to(device=DEVICE)
-        mask = torch.Tensor(np.stack(batch.mask)).to(device=DEVICE)
-        batchsz = s.size(0)
-
-        v = self.vnet(s, 'sys').squeeze(-1).detach()
-        log_pi_old_sa = self.policy.get_log_prob(s, a).detach()
-        r = self.rewarder.estimate(s, a, next_s, log_pi_old_sa).detach()
-        A_sa, v_target = self.est_adv(r, v, mask)
-
-        for i in range(self.update_round):
-            perm = torch.randperm(batchsz)
-            v_target_shuf, s_shuf = v_target[perm], s[perm]
-            optim_chunk_num = int(np.ceil(batchsz / self.optim_batchsz))
-            v_target_shuf, s_shuf = torch.chunk(v_target_shuf, optim_chunk_num), torch.chunk(s_shuf, optim_chunk_num)
-
-            value_loss = 0.
-            for v_target_b, s_b in zip(v_target_shuf, s_shuf):
-                self.vnet_optim.zero_grad()
-                v_b = self.vnet(s_b, 'sys').squeeze(-1)
-                loss = (v_b - v_target_b).pow(2).mean()
-                value_loss += loss.item()
-                loss.backward()
-                self.vnet_optim.step()
-
-            value_loss /= optim_chunk_num
-            logging.debug('<<dialog policy {}>> epoch {}, iteration {}, loss {}'.format("Reward Estimator", epoch, i, value_loss))
-
-        if value_loss < best:
-            logging.info('<<dialog policy>> best model saved')
-            best = value_loss  # 记录该损失为best
-            self.save(self.save_dir, 'best', True)  # 保存最佳模型
-        # 每隔XX轮保存一次模型
-        if (epoch + 1) % self.save_per_epoch == 0:
-            self.save(self.save_dir, epoch, True)
-        self.vnet.eval()  # 关闭训练模式
-
-        return best  # 返回最佳（最小）损失
     # 预训练RE（逆强化学习）
     def train_irl(self, epoch, batchsz):
         batch = self.sample(batchsz)
@@ -262,62 +214,9 @@ class Policy(object):
 
 
     """
-    计算模块
-    """
-    # 计算价值函数V和优势函数A
-    def est_adv(self, r, v, mask):
-        """
-        we save a trajectory in continuous space and it reaches the ending of current trajectory when mask=0.
-        :param r: reward, Tensor, [b]
-        :param v: estimated value, Tensor, [b]
-        :param mask: indicates ending for 0 otherwise 1, Tensor, [b]
-        :return: A(s, a), V-target(s), both Tensor
-
-        此函数用于估计优势函数。
-        """
-        batchsz = v.size(0)
-
-        # v_target is worked out by Bellman equation.
-        v_target = torch.Tensor(batchsz).to(device=DEVICE)
-        delta = torch.Tensor(batchsz).to(device=DEVICE) # TD-error
-        A_sa = torch.Tensor(batchsz).to(device=DEVICE) # 优势函数
-
-        # 上一时间步的V和A初始化为0
-        prev_v_target = 0
-        prev_v = 0
-        prev_A_sa = 0
-        for t in reversed(range(batchsz)):
-            # mask here indicates a end of trajectory
-            # this value will be treated as the target value of value network.
-            # mask = 0 means the immediate reward is the real V(s) since it's end of trajectory.
-            # formula: V(s_t) = r_t + gamma * V(s_t+1)
-            v_target[t] = r[t] + self.gamma * prev_v_target * mask[t]
-
-            # please refer to : https://arxiv.org/abs/1506.02438
-            # for generalized adavantage estimation
-            # formula: delta(s_t) = r_t + gamma * V(s_t+1) - V(s_t)
-            delta[t] = r[t] + self.gamma * prev_v * mask[t] - v[t]
-
-            # formula: A(s, a) = delta(s_t) + gamma * lamda * A(s_t+1, a_t+1)
-            # here use symbol tau as lambda, but original paper uses symbol lambda.
-            # 此处使用广义优势估计作为优势函数。
-            A_sa[t] = delta[t] + self.gamma * self.tau * prev_A_sa * mask[t]
-
-            # update previous
-            prev_v_target = v_target[t]
-            prev_v = v[t]
-            prev_A_sa = A_sa[t]
-
-        # normalize A_sa
-        A_sa = (A_sa - A_sa.mean()) / A_sa.std()
-
-        return A_sa, v_target
-
-
-    """
     辅助函数模块
     """
-    # 采样
+    # 采样，调用代码顶端的def sampler()
     def sample(self, batchsz):
         """
         Given batchsz number of task, the batchsz will be splited equally to each processes
@@ -360,24 +259,22 @@ class Policy(object):
         buff = buff0
 
         return buff.get_batch()
+    # 保存
     def save(self, directory, epoch, rl_only=False):
         if not os.path.exists(directory):
             os.makedirs(directory)
 
-        # 此处修改，追加保存value和RE
+        # 此处修改，追加保存RE
         if not rl_only:
             self.rewarder.save_irl(directory, epoch)    # 调用save_irl函数保存
-        torch.save(self.vnet.state_dict(), directory + '/' + str(epoch) + '_vnet.mdl')
         torch.save(self.policy.state_dict(), directory + '/' + str(epoch) + '_pol.mdl')
 
         logging.info('<<dialog policy {}>> epoch {}: saved network to mdl'.format(self.character, epoch))
+    # 载入
     def load(self, filename):
+        # 此处修改，追加保存RE
         self.rewarder.load_irl(filename)
-        vnet_mdl = filename + '_vnet.mdl'
         policy_mdl = filename + '_pol.mdl'
-        if os.path.exists(vnet_mdl):
-            self.vnet.load_state_dict(torch.load(vnet_mdl))
-            logging.info('<<dialog policy>> loaded checkpoint from file: {}'.format(vnet_mdl))
         if os.path.exists(policy_mdl):
             self.policy.load_state_dict(torch.load(policy_mdl))
             logging.info('<<dialog policy {}>> loaded checkpoint from file: {}'.format(self.character, policy_mdl))

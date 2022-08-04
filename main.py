@@ -17,6 +17,8 @@ from controller import Controller
 from agenda import UserAgenda
 from rule import SystemRule
 from datamanager import DataManager
+
+
 """
 预训练区
 """
@@ -36,18 +38,23 @@ def worker_policy_usr(args, manager, config):
     for e in range(args.epoch):
         agent.imitating(e)
         best = agent.imit_test(e, best)
-# 新增项
-def worker_estimator(args, manager, config, make_env):
-    init_logging_handler(args.log_dir, '_estimator')
-    agent = Policy(make_env, args, manager, config, args.process, 'sys', pre_irl=True)
+# 新增项：预训练RE
+def worker_estimator_sys(args, manager, config, make_env):
+    init_logging_handler(args.log_dir, '_estimator_sys')
+    agent = Policy(make_env, args, manager, config, character='sys', process_num=args.process, pre_irl=True)
     agent.load(args.save_dir+'/best')
-
-    best0, best1 = float('inf'), float('inf')
+    best = float('inf')
     for e in range(args.epoch):
         agent.train_irl(e, args.batchsz_traj)
-        best0 = agent.test_irl(e, args.batchsz, best0)
-        best1 = agent.imit_value(e, args.batchsz_traj, best1)
-
+        best = agent.test_irl(e, args.batchsz, best)
+def worker_estimator_usr(args, manager, config, make_env):
+    init_logging_handler(args.log_dir, '_estimator_usr')
+    agent = Policy(make_env, args, manager, config, character='usr', process_num=args.process, pre_irl=True)
+    agent.load(args.save_dir+'/best')
+    best = float('inf')
+    for e in range(args.epoch):
+        agent.train_irl(e, args.batchsz_traj)
+        best = agent.test_irl(e, args.batchsz, best)
 
 """
 环境区
@@ -94,8 +101,10 @@ if __name__ == '__main__':
         processes = []
         process_args = (args, manager, config)
 
-        # 预训练：RewardEstimator
-        worker_estimator(args, manager, config, make_env_agenda)
+        # 预训练：RewardEstimator  待修改！！！
+        worker_estimator_sys(args, manager, config, make_env_agenda)
+        worker_estimator_usr(args, manager, config, make_env_agenda)
+
         # 预训练：系统智能体
         processes.append(mp.Process(target=worker_policy_sys, args=process_args))
         # 预训练：用户智能体

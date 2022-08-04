@@ -1,30 +1,35 @@
 import os
 import logging
+
 import numpy as np
 import torch
 import torch.nn as nn
 from torch import optim
+
 from utils import to_device, reparameterize
 from dbquery import DBQuery
+from rlmodule import AIRL
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class RewardEstimator(object):
-    def __init__(self, args, manager, config, pretrain=False, inference=False):
+    def __init__(self, args, manager, config, character, pretrain=False, inference=False):
+
+        self.character = character
 
         # initialize IRL model
-        self.irl = AIRL(config, args.gamma).to(device=DEVICE)
+        self.irl = AIRL(config, args.gamma, character=character).to(device=DEVICE)
 
-        self.bce_loss = nn.BCEWithLogitsLoss()
         self.step = 0
         self.anneal = args.anneal
-        self.irl_params = self.irl.parameters()
-        self.irl_optim = optim.RMSprop(self.irl_params, lr=args.lr_irl)
+        self.optim_batchsz = args.batchsz
         self.weight_cliping_limit = args.clip
-
         self.save_dir = args.save_dir
         self.save_per_epoch = args.save_per_epoch
-        self.optim_batchsz = args.batchsz
+
+        self.bce_loss = nn.BCEWithLogitsLoss()
+        self.irl_params = self.irl.parameters()
+        self.irl_optim = optim.RMSprop(self.irl_params, lr=args.lr_irl)
         self.irl.eval()
 
         db = DBQuery(args.data_dir, config)
@@ -32,16 +37,16 @@ class RewardEstimator(object):
         # 预训练模式，切分3个数据集后放入迭代器中。
         if pretrain:
             self.print_per_batch = args.print_per_batch
-            self.data_train = manager.create_dataset_irl('train', args.batchsz, config, db)
-            self.data_valid = manager.create_dataset_irl('valid', args.batchsz, config, db)
-            self.data_test = manager.create_dataset_irl('test', args.batchsz, config, db)
+            self.data_train = manager.create_dataset_irl('train', args.batchsz, config, db, character)
+            self.data_valid = manager.create_dataset_irl('valid', args.batchsz, config, db, character)
+            self.data_test = manager.create_dataset_irl('test', args.batchsz, config, db, character)
             self.irl_iter = iter(self.data_train)
             self.irl_iter_valid = iter(self.data_valid)
             self.irl_iter_test = iter(self.data_test)
         # 训练模式，切分2个数据集后放入迭代器中。
         elif not inference:
-            self.data_train = manager.create_dataset_irl('train', args.batchsz, config, db)
-            self.data_valid = manager.create_dataset_irl('valid', args.batchsz, config, db)
+            self.data_train = manager.create_dataset_irl('train', args.batchsz, config, db, character)
+            self.data_valid = manager.create_dataset_irl('valid', args.batchsz, config, db, character)
             self.irl_iter = iter(self.data_train)
             self.irl_iter_valid = iter(self.data_valid)
 
@@ -253,34 +258,3 @@ class RewardEstimator(object):
         if os.path.exists(irl_mdl):
             self.irl.load_state_dict(torch.load(irl_mdl))
             logging.info('<<reward estimator>> loaded checkpoint from file: {}'.format(irl_mdl))
-
-
-"""
-下面定义逆强化学习网络结构，将reward estimator f(s,a)分为g(s,a)和h(s)。其中g()和h()为单层感知机结构。
-"""
-class AIRL(nn.Module):
-    """
-    label: 1 for real, 0 for generated
-    """
-
-    def __init__(self, cfg, gamma):
-        super(AIRL, self).__init__()
-
-        self.gamma = gamma
-        self.g = nn.Sequential(nn.Linear(cfg.s_dim + cfg.a_dim, cfg.hi_dim),
-                               nn.ReLU(),
-                               nn.Linear(cfg.hi_dim, 1))
-        self.h = nn.Sequential(nn.Linear(cfg.s_dim, cfg.hi_dim),
-                               nn.ReLU(),
-                               nn.Linear(cfg.hi_dim, 1))
-
-    def forward(self, s, a, next_s):
-        """
-        :param s: [b, s_dim]
-        :param a: [b, a_dim]
-        :param next_s: [b, s_dim]
-        :return:  [b, 1]
-        """
-        # g(s,a) + γ * h(s') - h(s)
-        weights = self.g(torch.cat([s, a], -1)) + self.gamma * self.h(next_s) - self.h(s)
-        return weights
