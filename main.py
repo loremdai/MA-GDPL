@@ -103,8 +103,8 @@ if __name__ == '__main__':
         re_process_args = (args, manager, config, make_env_agenda)
 
         # 预训练：RewardEstimator  待修改！！！
-        processes.append(mp.Process(target=worker_policy_sys, args=re_process_args))
-        processes.append(mp.Process(target=worker_policy_usr, args=re_process_args))
+        processes.append(mp.Process(target=worker_policy_sys, args=process_args))
+        processes.append(mp.Process(target=worker_policy_usr, args=process_args))
         # worker_estimator_sys(args, manager, config, make_env_agenda)
         # worker_estimator_usr(args, manager, config, make_env_agenda)
 
