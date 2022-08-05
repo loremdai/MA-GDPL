@@ -250,11 +250,11 @@ class RewardEstimator(object):
             os.makedirs(directory)
 
         torch.save(self.irl.state_dict(), directory + '/' + str(epoch) + '_estimator.mdl')
-        logging.info('<<reward estimator>> epoch {}: saved network to mdl'.format(epoch))
+        logging.info('<<reward estimator {}>> epoch {}: saved network to mdl'.format(self.character, epoch))
 
     # 载入模型
     def load_irl(self, filename):
         irl_mdl = filename + '_estimator.mdl'
         if os.path.exists(irl_mdl):
             self.irl.load_state_dict(torch.load(irl_mdl))
-            logging.info('<<reward estimator>> loaded checkpoint from file: {}'.format(irl_mdl))
+            logging.info('<<reward estimator {}>> loaded checkpoint from file: {}'.format(self.character, irl_mdl))
