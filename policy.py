@@ -100,7 +100,7 @@ class Policy(object):
                 a_loss = 0.
         
         if (epoch+1) % self.save_per_epoch == 0:
-            self.save(self.save_dir, epoch, True)
+            self.save(self.save_dir, epoch)
         self.policy.eval()
     # 测试智能体
     def imit_test(self, epoch, best):
@@ -117,7 +117,7 @@ class Policy(object):
         if a_loss < best:
             logging.info('<<dialog policy {}>> best model saved'.format(self.character))
             best = a_loss
-            self.save(self.save_dir, 'best', True)
+            self.save(self.save_dir, 'best')
             
         a_loss = 0.
         for i, data in enumerate(self.data_test):
