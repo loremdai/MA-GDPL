@@ -114,9 +114,9 @@ class RewardEstimator(object):
 
     # 验证和测试最优模型
     def test_irl(self, batch, epoch, best):
-        input_s = torch.from_numpy(np.stack(batch.state)).to(device=DEVICE)
-        input_a = torch.from_numpy(np.stack(batch.action)).to(device=DEVICE)
-        input_next_s = torch.from_numpy(np.stack(batch.next_state)).to(device=DEVICE)
+        input_s = torch.from_numpy(np.stack(batch.state_sys)).to(device=DEVICE)
+        input_a = torch.from_numpy(np.stack(batch.action_sys)).to(device=DEVICE)
+        input_next_s = torch.from_numpy(np.stack(batch.state_sys_next)).to(device=DEVICE)
         batchsz = input_s.size(0)
 
         # 将sampler()得到的数据分块
