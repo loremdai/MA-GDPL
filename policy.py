@@ -18,7 +18,7 @@ from rlmodule import MultiDiscretePolicy
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Policy(object):
-    def __init__(self, env_cls, args, manager, cfg, process_num, character, pre=False, pre_irl=False, infer=False):
+    def __init__(self, env_cls, args, manager, cfg, process_num, character, pre=False):
         """
         :param env_cls: env class or function, not instance, as we need to create several instance in class.
         :param args:
@@ -36,8 +36,7 @@ class Policy(object):
         # 为每个进程初始化环境。
         self.env_list = []
         for _ in range(process_num):
-            self.env_list.append(env_cls(args.data_dir, cfg))
-            # self.env_list.append(env_cls())
+            self.env_list.append(env_cls())
 
         # 实例化策略和混合价值网络。
         self.policy = MultiDiscretePolicy(cfg, character).to(device=DEVICE)

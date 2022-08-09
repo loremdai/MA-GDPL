@@ -76,6 +76,10 @@ def sampler(pid, queue, evt, env, policy_usr, policy_sys, batchsz):
                 next_s_next, _ = env.step_usr(s, a_next)  # 与环境交互得到状态S'^s
                 next_s_vec_next = torch.Tensor(state_vectorize(next_s_next, env.cfg, env.db))
                 env.set_rollout(False)
+
+                r_usr = 20 if env.evaluator.inform_F1(ansbysys=False)[1] == 1. else -5
+                r_sys = 20 if env.evaluator.task_success(False) else -5
+                r_global = 20 if env.evaluator.task_success() else -5
             else:
                 # one step roll out
                 env.set_rollout(True)
@@ -86,10 +90,37 @@ def sampler(pid, queue, evt, env, policy_usr, policy_sys, batchsz):
                 next_s_vec_next = torch.Tensor(state_vectorize(next_s_next, env.cfg, env.db))
                 env.set_rollout(False)
 
+                r_usr = 0
+                if not s['user_action']:
+                    r_usr -= 5
+                if env.evaluator.cur_domain:
+                    for da in s['user_action']:
+                        d, i, k = da.split('-')
+                        if i == 'request':
+                            for slot, value in s['goal_state'][d].items():
+                                if value != '?' and slot in s['user_goal'][d] \
+                                        and s['user_goal'][d][slot] != '?':
+                                    # request before express constraint
+                                    r_usr -= 1
+                r_sys = 0
+                if not next_s['sys_action']:
+                    r_sys -= 5
+                if env.evaluator.cur_domain:
+                    for slot, value in next_s['belief_state'][env.evaluator.cur_domain].items():
+                        if value == '?':
+                            for da in next_s['sys_action']:
+                                d, i, k, p = da.split('-')
+                                if i in ['inform', 'recommend', 'offerbook', 'offerbooked'] and k == slot:
+                                    break
+                            else:
+                                # not answer request
+                                r_sys -= 1
+                r_global = 5 if env.evaluator.cur_domain and env.evaluator.domain_success(
+                    env.evaluator.cur_domain) else -1
+
             # save to queue
-            # s^u, a^u, s'^u, s^s, a^s, s'^s, t
-            buff.push(s_vec.numpy(), a.numpy(), s_vec_next.numpy(), next_s_vec.numpy(), next_a.numpy(),
-                      next_s_vec_next.numpy(), done)
+            # s^u, a^u, r^u, s'^u, s^s, a^s, r^s, s'^s, t, r_glo
+            buff.push(s_vec.numpy(), a.numpy(), r_usr, s_vec_next.numpy(), next_s_vec.numpy(), next_a.numpy(), r_sys, next_s_vec_next.numpy(), done, r_global)
 
             # update per step
             real_traj_len = t
