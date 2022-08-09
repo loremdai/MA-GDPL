@@ -177,7 +177,10 @@ class AIRL(nn.Module):
 """
 下面定义记忆（回放缓存），经验采用元组存储，缓存采用列表结构
 """
-Transition = namedtuple('Transition', ('state', 'action', 'mask', 'next_state'))
+Transition = namedtuple('Transition', ('state_usr', 'action_usr', 'reward_usr', 'state_usr_next', \
+                                       'state_sys', 'action_sys', 'reward_sys', 'state_sys_next', \
+                                       'mask', 'reward_global'))
+
 class Memory(object):
 
     def __init__(self):

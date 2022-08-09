@@ -13,7 +13,7 @@ from rlmodule import AIRL
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class RewardEstimator(object):
-    def __init__(self, args, manager, config, character, pretrain=False, inference=False):
+    def __init__(self, args, config, manager, character, pretrain=False, inference=False):
 
         self.character = character
 
@@ -56,7 +56,7 @@ class RewardEstimator(object):
         beta = min(self.step / self.anneal, 1) if istrain else 1
         return beta * klds
 
-    # 计算并返回真实经验与模拟经验的loss
+    # 分别计算并返回真实经验、模拟经验的loss
     def irl_loop(self, data_real, data_gen):
         s_real, a_real, next_s_real = to_device(data_real)
         s, a, next_s = data_gen
@@ -73,23 +73,23 @@ class RewardEstimator(object):
     # 训练模型
     def train_irl(self, batch, epoch):
         self.irl.train()
-        input_s = torch.from_numpy(np.stack(batch.state)).to(device=DEVICE)
-        input_a = torch.from_numpy(np.stack(batch.action)).to(device=DEVICE)
-        input_next_s = torch.from_numpy(np.stack(batch.next_state)).to(device=DEVICE)
+
+        input_s = torch.from_numpy(np.stack(batch.state_sys)).to(device=DEVICE)
+        input_a = torch.from_numpy(np.stack(batch.action_sys)).to(device=DEVICE)
+        input_next_s = torch.from_numpy(np.stack(batch.state_sys_next)).to(device=DEVICE)
         batchsz = input_s.size(0)
 
-        # 将数据按照batch_size分块
+        # 将sampler()得到的数据分块
         turns = batchsz // self.optim_batchsz
         s_chunk = torch.chunk(input_s, turns)
         a_chunk = torch.chunk(input_a.float(), turns)
         next_s_chunk = torch.chunk(input_next_s, turns)
 
+        # 训练
         real_loss, gen_loss = 0., 0.
-
-        # 在训练集上训练
         for s, a, next_s in zip(s_chunk, a_chunk, next_s_chunk):
             try:
-                data = self.irl_iter.next()
+                data = self.irl_iter.next() # data为数据集的数据
             except StopIteration:
                 self.irl_iter = iter(self.data_train)
                 data = self.irl_iter.next()
@@ -119,14 +119,14 @@ class RewardEstimator(object):
         input_next_s = torch.from_numpy(np.stack(batch.next_state)).to(device=DEVICE)
         batchsz = input_s.size(0)
 
+        # 将sampler()得到的数据分块
         turns = batchsz // self.optim_batchsz
         s_chunk = torch.chunk(input_s, turns)
         a_chunk = torch.chunk(input_a.float(), turns)
         next_s_chunk = torch.chunk(input_next_s, turns)
 
-        real_loss, gen_loss = 0., 0.
-
         # 在验证集上找出最优模型
+        real_loss, gen_loss = 0., 0.
         for s, a, next_s in zip(s_chunk, a_chunk, next_s_chunk):
             try:
                 data = self.irl_iter_valid.next()
@@ -176,6 +176,7 @@ class RewardEstimator(object):
             self.irl.train()
         input_s, input_a, input_next_s = inputs
 
+        # 分块
         turns = batchsz // self.optim_batchsz
         s_chunk = torch.chunk(input_s, turns)
         a_chunk = torch.chunk(input_a.float(), turns)
@@ -184,14 +185,14 @@ class RewardEstimator(object):
         real_loss, gen_loss = 0., 0.
 
         for s, a, next_s in zip(s_chunk, a_chunk, next_s_chunk):
-            # 如果为训练模式，则进行训练
+            # 训练模式
             if backward:
                 try:
                     data = self.irl_iter.next()
                 except StopIteration:
                     self.irl_iter = iter(self.data_train)
                     data = self.irl_iter.next()
-            # 否则即为测试模式，在验证集上进行验证。
+            # 测试模式
             else:
                 try:
                     data = self.irl_iter_valid.next()
@@ -201,9 +202,11 @@ class RewardEstimator(object):
 
             if backward:
                 self.irl_optim.zero_grad()
+
             loss_real, loss_gen = self.irl_loop(data, (s, a, next_s))
             real_loss += loss_real.item()
             gen_loss += loss_gen.item()
+
             if backward:
                 loss = loss_real + loss_gen
                 loss.backward()
@@ -215,18 +218,18 @@ class RewardEstimator(object):
         real_loss /= turns
         gen_loss /= turns
 
-        # 如果为训练模式，则记录训练结果
+        # 训练模式：记录训练结果
         if backward:
             logging.debug('<<reward estimator {}>> test, epoch {}, loss_real:{}, loss_gen:{}'.format(
                 self.character, epoch, real_loss, gen_loss))
             self.irl.eval()
-        # 否则即为测试模式，记录验证集结果，保存最佳模型
+        # 否则即为测试模式：记录验证集结果，保存最佳模型
         else:
             logging.debug('<<reward estimator {}>> test, epoch {}, loss_real:{}, loss_gen:{}'.format(
                 self.character, epoch, real_loss, gen_loss))
             loss = real_loss + gen_loss
             if loss < best:
-                logging.info('<<reward estimator>> best model saved')
+                logging.info('<<reward estimator {}>> best model saved'.format(self.character))
                 best = loss
                 self.save_irl(self.save_dir, 'best')
             return best
@@ -244,7 +247,7 @@ class RewardEstimator(object):
         reward = (weight - log_pi).squeeze(-1)
         return reward
 
-    # 保存模型
+    # 保存模型（可能要修改）
     def save_irl(self, directory, epoch):
         if not os.path.exists(directory):
             os.makedirs(directory)
@@ -252,7 +255,7 @@ class RewardEstimator(object):
         torch.save(self.irl.state_dict(), directory + '/' + str(epoch) + '_estimator.mdl')
         logging.info('<<reward estimator {}>> epoch {}: saved network to mdl'.format(self.character, epoch))
 
-    # 载入模型
+    # 载入模型（可能要修改）
     def load_irl(self, filename):
         irl_mdl = filename + '_estimator.mdl'
         if os.path.exists(irl_mdl):

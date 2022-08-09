@@ -16,6 +16,7 @@ from controller import Controller
 
 from agenda import UserAgenda
 from rule import SystemRule
+
 from datamanager import DataManager
 
 
@@ -41,15 +42,15 @@ def worker_policy_usr(args, manager, config):
 # 新增项：预训练RE
 def worker_estimator_sys(args, manager, config, make_env):
     init_logging_handler(args.log_dir, '_estimator_sys')
-    agent = Policy(make_env, args, manager, config, character='sys', process_num=args.process, pre_irl=True)
+    agent = Learner(make_env, args, config, process_num=args.process, manager=manager, character='sys', pre_irl=True)
     agent.load(args.save_dir+'/best')
     best = float('inf')
     for e in range(args.epoch):
         agent.train_irl(e, args.batchsz_traj)
-        best = agent.test_irl(e, args.batchsz, best)
+        # best = agent.test_irl(e, args.batchsz, best)
 def worker_estimator_usr(args, manager, config, make_env):
     init_logging_handler(args.log_dir, '_estimator_usr')
-    agent = Policy(make_env, args, manager, config, character='usr', process_num=args.process, pre_irl=True)
+    agent = Learner(make_env, args, config, process_num=args.process, manager=manager, character='usr', pre_irl=True)
     agent.load(args.save_dir+'/best')
     best = float('inf')
     for e in range(args.epoch):
@@ -70,7 +71,6 @@ def make_env_rule(data_dir, config):
 def make_env_agenda(data_dir, config):
     env = UserAgenda(data_dir, config)
     return env
-
 
 """
 主函数区
@@ -109,9 +109,9 @@ if __name__ == '__main__':
             p.start()
         for p in processes:
             p.join()
-        worker_estimator_sys(args, manager, config, make_env_agenda)
-        worker_estimator_usr(args, manager, config, make_env_agenda)
-
+        # 预训练：系统/用户端智能体
+        worker_estimator_sys(args, manager, config, make_env)
+        # worker_estimator_usr(args, manager, config, make_env_agenda)
     # 测试模式
     elif args.test:
         logging.debug('test')
@@ -123,11 +123,11 @@ if __name__ == '__main__':
         # 测试：用户vs系统
         agent.evaluate(args.test_case)
         
-        # 测试系统智能体：使用基于日程的用户模拟器
+        # 测试系统智能体：使用Agenda-based用户模拟器
         env = make_env_agenda(args.data_dir, config)
         agent.evaluate_with_agenda(env, args.test_case)
 
-        # 测试用户智能体：使用基于规则的系统智能体
+        # 测试用户智能体：使用Rule-based系统智能体
         env = make_env_rule(args.data_dir, config)
         agent.evaluate_with_rule(env, args.test_case)
     # 训练模式

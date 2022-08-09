@@ -31,7 +31,6 @@ def expand_da(meta):
                         counter[pair[0]] = 1
                     pair.insert(1, str(counter[pair[0]]))
 
-
 def add_domain_mask(data):
     all_domains = ["train", "hotel", "restaurant", "attraction", "taxi", "police", "hospital"]
     parts = ["train", "valid", "test"]
@@ -153,6 +152,7 @@ class DataManager():
             goal_state = turn_data['goal_state']
             init_goal(session_data, goal_state, sess['goal'], cfg)
             self.goal[part][k_sess] = deepcopy(session_data)
+
             current_domain = ''
             book_domain = ''
             turn_data['trg_user_action'] = {}
@@ -495,7 +495,6 @@ class DataManager():
 
         logging.debug('finish loading irl {}'.format(part))
         return dataloader
-
 
 class Dataset_Policy(data.Dataset):
     def __init__(self, s, a):
