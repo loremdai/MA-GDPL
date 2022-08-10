@@ -101,7 +101,6 @@ if __name__ == '__main__':
         processes = []
         process_args = (args, manager, config)
 
-
         # 预训练：系统智能体
         processes.append(mp.Process(target=worker_policy_sys, args=process_args))
         # 预训练：用户智能体

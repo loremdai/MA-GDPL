@@ -17,24 +17,25 @@ class RewardEstimator(object):
 
         self.character = character
 
-        # initialize IRL model
+        # 实例化IRL模型
         self.irl = AIRL(config, args.gamma, character=character).to(device=DEVICE)
 
+        # 超参数设定区
         self.step = 0
         self.anneal = args.anneal
         self.optim_batchsz = args.batchsz
         self.weight_cliping_limit = args.clip
-        self.save_dir = args.save_dir
         self.save_per_epoch = args.save_per_epoch
+        self.save_dir = args.save_dir
 
-        self.bce_loss = nn.BCEWithLogitsLoss()
         self.irl_params = self.irl.parameters()
         self.irl_optim = optim.RMSprop(self.irl_params, lr=args.lr_irl)
         self.irl.eval()
+        self.bce_loss = nn.BCEWithLogitsLoss()
 
         db = DBQuery(args.data_dir, config)
 
-        # 预训练模式，切分3个数据集后放入迭代器中。
+        # 预训练模式：切分3个数据集 -> 放入迭代器中。
         if pretrain:
             self.print_per_batch = args.print_per_batch
             self.data_train = manager.create_dataset_irl('train', args.batchsz, config, db, character)
@@ -43,7 +44,7 @@ class RewardEstimator(object):
             self.irl_iter = iter(self.data_train)
             self.irl_iter_valid = iter(self.data_valid)
             self.irl_iter_test = iter(self.data_test)
-        # 训练模式，切分2个数据集后放入迭代器中。
+        # 训练模式：切分训练集和验证集 -> 放入迭代器中。
         elif not inference:
             self.data_train = manager.create_dataset_irl('train', args.batchsz, config, db, character)
             self.data_valid = manager.create_dataset_irl('valid', args.batchsz, config, db, character)
@@ -74,9 +75,16 @@ class RewardEstimator(object):
     def train_irl(self, batch, epoch):
         self.irl.train()
 
-        input_s = torch.from_numpy(np.stack(batch.state_sys)).to(device=DEVICE)
-        input_a = torch.from_numpy(np.stack(batch.action_sys)).to(device=DEVICE)
-        input_next_s = torch.from_numpy(np.stack(batch.state_sys_next)).to(device=DEVICE)
+        if self.character == 'sys':
+            input_s = torch.from_numpy(np.stack(batch.state_sys)).to(device=DEVICE)
+            input_a = torch.from_numpy(np.stack(batch.action_sys)).to(device=DEVICE)
+            input_next_s = torch.from_numpy(np.stack(batch.state_sys_next)).to(device=DEVICE)
+        elif self.character == 'usr':
+            input_s = torch.from_numpy(np.stack(batch.state_usr)).to(device=DEVICE)
+            input_a = torch.from_numpy(np.stack(batch.action_usr)).to(device=DEVICE)
+            input_next_s = torch.from_numpy(np.stack(batch.state_usr_next)).to(device=DEVICE)
+        else:
+            raise NotImplementedError('Unknown character {}'.format(self.character))
         batchsz = input_s.size(0)
 
         # 将sampler()得到的数据分块
@@ -114,9 +122,16 @@ class RewardEstimator(object):
 
     # 验证和测试最优模型
     def test_irl(self, batch, epoch, best):
-        input_s = torch.from_numpy(np.stack(batch.state_sys)).to(device=DEVICE)
-        input_a = torch.from_numpy(np.stack(batch.action_sys)).to(device=DEVICE)
-        input_next_s = torch.from_numpy(np.stack(batch.state_sys_next)).to(device=DEVICE)
+        if self.character == 'sys':
+            input_s = torch.from_numpy(np.stack(batch.state_sys)).to(device=DEVICE)
+            input_a = torch.from_numpy(np.stack(batch.action_sys)).to(device=DEVICE)
+            input_next_s = torch.from_numpy(np.stack(batch.state_sys_next)).to(device=DEVICE)
+        elif self.character == 'usr':
+            input_s = torch.from_numpy(np.stack(batch.state_usr)).to(device=DEVICE)
+            input_a = torch.from_numpy(np.stack(batch.action_usr)).to(device=DEVICE)
+            input_next_s = torch.from_numpy(np.stack(batch.state_usr_next)).to(device=DEVICE)
+        else:
+            raise NotImplementedError('Unknown character {}'.format(self.character))
         batchsz = input_s.size(0)
 
         # 将sampler()得到的数据分块
