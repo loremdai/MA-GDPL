@@ -138,11 +138,9 @@ class Policy(object):
             os.makedirs(directory)
 
         torch.save(self.policy.state_dict(), directory + '/' + str(epoch) + '_pol.mdl')
-
         logging.info('<<dialog policy {}>> epoch {}: saved network to mdl'.format(self.character, epoch))
     # 载入
     def load(self, filename):
-
         policy_mdl = filename + '_pol.mdl'
         if os.path.exists(policy_mdl):
             self.policy.load_state_dict(torch.load(policy_mdl))

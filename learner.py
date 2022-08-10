@@ -177,11 +177,6 @@ class Learner():
         self.process_num = process_num
         self.writer = SummaryWriter()
 
-    # 更新目标网络
-    def _update_targets(self):
-        self.target_vnet.load_state_dict(self.vnet.state_dict())
-        logging.info('Updated target network')
-
     """
     预训练RewardEstimator模块
     """
@@ -194,6 +189,13 @@ class Learner():
         batch = self.sample(batchsz)
         best = self.rewarder.test_irl(batch, epoch, best)   # best = float('inf')
         return best
+
+    """ 
+    更新目标网络
+    """
+    def _update_targets(self):
+        self.target_vnet.load_state_dict(self.vnet.state_dict())
+        logging.info('Updated target network')
 
     """
     测试模块
