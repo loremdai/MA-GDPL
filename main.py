@@ -101,8 +101,7 @@ if __name__ == '__main__':
         processes = []
         process_args = (args, manager, config)
 
-        # 预训练：系统/用户端智能体
-        worker_estimator_sys(args, manager, config, make_env)
+
         # 预训练：系统智能体
         processes.append(mp.Process(target=worker_policy_sys, args=process_args))
         # 预训练：用户智能体
@@ -111,8 +110,9 @@ if __name__ == '__main__':
             p.start()
         for p in processes:
             p.join()
-
-        # worker_estimator_usr(args, manager, config, make_env_agenda)
+        # 预训练：系统/用户端智能体
+        worker_estimator_sys(args, manager, config, make_env)
+        worker_estimator_usr(args, manager, config, make_env)
     # 测试模式
     elif args.test:
         logging.debug('test')
