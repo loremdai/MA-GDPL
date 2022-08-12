@@ -40,17 +40,9 @@ def worker_policy_usr(args, manager, config):
         agent.imitating(e)
         best = agent.imit_test(e, best)
 # 新增项：预训练RE
-def worker_estimator_sys(args, manager, config, make_env):
-    init_logging_handler(args.log_dir, '_estimator_sys')
-    agent = Learner(make_env, args, config, args.process, manager, 'sys', pre_irl=True)
-    agent.load(args.save_dir+'/best')
-    best = float('inf')
-    for e in range(args.epoch):
-        agent.train_irl(e, args.batchsz_traj)
-        best = agent.test_irl(e, args.batchsz, best)
-def worker_estimator_usr(args, manager, config, make_env):
-    init_logging_handler(args.log_dir, '_estimator_usr')
-    agent = Learner(make_env, args, config, args.process, manager, 'usr', pre_irl=True)
+def worker_estimator(args, manager, config, make_env):
+    init_logging_handler(args.log_dir, '_estimator')
+    agent = Learner(make_env, args, config, args.process, manager, pre_irl=True)
     agent.load(args.save_dir+'/best')
     best = float('inf')
     for e in range(args.epoch):
@@ -110,8 +102,7 @@ if __name__ == '__main__':
         for p in processes:
             p.join()
         # 预训练：系统/用户端智能体
-        worker_estimator_sys(args, manager, config, make_env)
-        worker_estimator_usr(args, manager, config, make_env)
+        worker_estimator(args, manager, config, make_env)
     # 测试模式
     elif args.test:
         logging.debug('test')

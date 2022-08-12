@@ -141,7 +141,7 @@ def sampler(pid, queue, evt, env, policy_usr, policy_sys, batchsz):
 
 class Learner():
 
-    def __init__(self, env_cls, args, cfg, process_num, manager, character='sys', pre_irl=False, infer=False):
+    def __init__(self, env_cls, args, cfg, process_num, manager, pre_irl=False, infer=False):
         self.policy_sys = MultiDiscretePolicy(cfg).to(device=DEVICE)
         self.policy_usr = MultiDiscretePolicy(cfg, 'usr').to(device=DEVICE)
         self.vnet = HybridValue(cfg).to(device=DEVICE)
