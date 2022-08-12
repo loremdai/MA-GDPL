@@ -141,11 +141,12 @@ def sampler(pid, queue, evt, env, policy_usr, policy_sys, batchsz):
 
 class Learner():
 
-    def __init__(self, env_cls, args, cfg, process_num, manager, character, pre_irl, infer=False):
+    def __init__(self, env_cls, args, cfg, process_num, manager, character='sys', pre_irl=False, infer=False):
         self.policy_sys = MultiDiscretePolicy(cfg).to(device=DEVICE)
         self.policy_usr = MultiDiscretePolicy(cfg, 'usr').to(device=DEVICE)
         self.vnet = HybridValue(cfg).to(device=DEVICE)
-        self.rewarder = RewardEstimator(args, cfg, manager, character, pretrain=pre_irl, inference=infer)
+        self.rewarder_sys = RewardEstimator(args, cfg, manager, character='sys', pretrain=pre_irl, inference=infer)
+        self.rewarder_usr = RewardEstimator(args, cfg, manager, character='usr', pretrain=pre_irl, inference=infer)
 
         # initialize envs for each process
         self.env_list = []
@@ -183,12 +184,14 @@ class Learner():
     # 预训练RE（逆强化学习）
     def train_irl(self, epoch, batchsz):
         batch = self.sample(batchsz)
-        self.rewarder.train_irl(batch, epoch)
+        self.rewarder_sys.train_irl(batch, epoch)
+        self.rewarder_usr.train_irl(batch, epoch)
     # 测试RE
     def test_irl(self, epoch, batchsz, best):
         batch = self.sample(batchsz)
-        best = self.rewarder.test_irl(batch, epoch, best)   # best = float('inf')
-        return best
+        best_sys = self.rewarder_sys.test_irl(batch, epoch, best)   # best = float('inf')
+        best_usr = self.rewarder_usr.test_irl(batch, epoch, best)
+        return best_sys, best_usr
 
     """ 
     更新目标网络
