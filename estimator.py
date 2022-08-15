@@ -235,12 +235,12 @@ class RewardEstimator(object):
 
         # 训练模式：记录训练结果
         if backward:
-            logging.debug('<<reward estimator {}>> test, epoch {}, loss_real:{}, loss_gen:{}'.format(
+            logging.debug('<<reward estimator {}>> epoch {}, loss_real:{}, loss_gen:{}'.format(
                 self.character, epoch, real_loss, gen_loss))
             self.irl.eval()
         # 否则即为测试模式：记录验证集结果，保存最佳模型
         else:
-            logging.debug('<<reward estimator {}>> test, epoch {}, loss_real:{}, loss_gen:{}'.format(
+            logging.debug('<<reward estimator {}>> validation, epoch {}, loss_real:{}, loss_gen:{}'.format(
                 self.character, epoch, real_loss, gen_loss))
             loss = real_loss + gen_loss
             if loss < best:
