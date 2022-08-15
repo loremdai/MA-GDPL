@@ -453,7 +453,7 @@ class Learner():
             best[1] = self.rewarder_usr.update_irl(inputs_usr, batchsz, epoch, best[1])
 
         # 3. compute rewards
-        log_pi_old_sa_sys = self.policy_usr.get_log_prob(s_sys, a_sys).detach()
+        log_pi_old_sa_sys = self.policy_sys.get_log_prob(s_sys, a_sys).detach()
         log_pi_old_sa_usr = self.policy_usr.get_log_prob(s_usr, a_usr).detach()
 
         r_sys = self.rewarder_sys.estimate(s_sys, a_sys, s_sys_next, log_pi_old_sa_sys).detach()
