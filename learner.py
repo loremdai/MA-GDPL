@@ -511,6 +511,7 @@ class Learner():
                     zip(v_target_usr_shuf, A_usr_shuf, s_usr_shuf, a_usr_shuf, log_pi_old_sa_usr_shuf,
                         v_target_sys_shuf, A_sys_shuf, s_sys_shuf, a_sys_shuf, log_pi_old_sa_sys_shuf,
                         A_glo_shuf, r_glo_shuf):
+
                 # 1. update value network
                 # update usr vnet
                 v_usr_b = self.vnet(s_usr_b, 'usr').squeeze(-1)
@@ -519,13 +520,13 @@ class Learner():
 
                 # update sys vnet
                 v_sys_b = self.vnet(s_sys_b, 'sys').squeeze(-1)
+                print("v_glo size:{}".format(v_sys_b.size()))
+                print("v_target_glo size:{}".format(v_target_sys_b.size()))
                 loss_sys = self.l2_loss(v_sys_b, v_target_sys_b)
                 vnet_sys_loss += loss_sys.item()
 
                 # update global vnet
                 v_glo_b = self.vnet((s_usr_b, s_sys_b), 'global')
-                print("v_glo size:{}".format(v_glo_b.size()))
-                print("v_target_glo size:{}".format(v_target_glo.size()))
                 loss_glo = self.l2_loss(v_glo_b, v_target_glo)
                 vnet_glo_loss += loss_glo.item()
 
