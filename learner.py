@@ -490,28 +490,29 @@ class Learner():
             # 1. shuffle current batch
             perm = torch.randperm(batchsz)
 
-            v_target_usr_shuf, A_usr_shuf, s_usr_shuf, a_usr_shuf, log_pi_old_sa_usr_shuf, v_target_sys_shuf, A_sys_shuf, s_sys_shuf, a_sys_shuf, log_pi_old_sa_sys_shuf, A_glo_shuf, r_glo_shuf = \
-                v_target_usr[perm], A_usr[perm], s_usr[perm], a_usr[perm], log_pi_old_sa_usr[perm], v_target_sys[perm], \
-                A_sys[perm], s_sys[perm], a_sys[perm], log_pi_old_sa_sys[perm], A_glo[perm], r_glo[perm]
+            v_target_usr_shuf, A_usr_shuf, s_usr_shuf, a_usr_shuf, log_pi_old_sa_usr_shuf, v_target_sys_shuf, A_sys_shuf, s_sys_shuf, a_sys_shuf, log_pi_old_sa_sys_shuf, v_target_glo_shuf, A_glo_shuf, r_glo_shuf = \
+                v_target_usr[perm], A_usr[perm], s_usr[perm], a_usr[perm], log_pi_old_sa_usr[perm], \
+                v_target_sys[perm], A_sys[perm], s_sys[perm], a_sys[perm], log_pi_old_sa_sys[perm], \
+                v_target_glo[perm], A_glo[perm], r_glo[perm]
 
             # 2. get mini-batch for optimizing
             optim_chunk_num = int(np.ceil(batchsz / self.optim_batchsz))
             # chunk the optim_batch for total batch
-            v_target_usr_shuf, A_usr_shuf, s_usr_shuf, a_usr_shuf, log_pi_old_sa_usr_shuf, v_target_sys_shuf, A_sys_shuf, s_sys_shuf, a_sys_shuf, log_pi_old_sa_sys_shuf, A_glo_shuf, r_glo_shuf = \
+            v_target_usr_shuf, A_usr_shuf, s_usr_shuf, a_usr_shuf, log_pi_old_sa_usr_shuf, v_target_sys_shuf, A_sys_shuf, s_sys_shuf, a_sys_shuf, log_pi_old_sa_sys_shuf, v_target_glo_shuf, A_glo_shuf, r_glo_shuf = \
                 torch.chunk(v_target_usr_shuf, optim_chunk_num), torch.chunk(A_usr_shuf, optim_chunk_num), torch.chunk(
                     s_usr_shuf, optim_chunk_num), \
                 torch.chunk(a_usr_shuf, optim_chunk_num), torch.chunk(log_pi_old_sa_usr_shuf, optim_chunk_num), \
                 torch.chunk(v_target_sys_shuf, optim_chunk_num), torch.chunk(A_sys_shuf, optim_chunk_num), torch.chunk(
                     s_sys_shuf, optim_chunk_num), \
                 torch.chunk(a_sys_shuf, optim_chunk_num), torch.chunk(log_pi_old_sa_sys_shuf, optim_chunk_num), \
-                torch.chunk(A_glo_shuf, optim_chunk_num), torch.chunk(r_glo_shuf, optim_chunk_num)
+                torch.chunk(v_target_glo_shuf, optim_chunk_num), torch.chunk(A_glo_shuf, optim_chunk_num), torch.chunk(
+                    r_glo_shuf, optim_chunk_num)
 
             # 3. iterate all mini-batch to optimize
-            for v_target_usr_b, A_usr_b, s_usr_b, a_usr_b, log_pi_old_sa_usr_b, v_target_sys_b, A_sys_b, s_sys_b, a_sys_b, log_pi_old_sa_sys_b, A_glo_b, r_glo_b in \
+            for v_target_usr_b, A_usr_b, s_usr_b, a_usr_b, log_pi_old_sa_usr_b, v_target_sys_b, A_sys_b, s_sys_b, a_sys_b, log_pi_old_sa_sys_b, v_target_glo_b, A_glo_b, r_glo_b in \
                     zip(v_target_usr_shuf, A_usr_shuf, s_usr_shuf, a_usr_shuf, log_pi_old_sa_usr_shuf,
                         v_target_sys_shuf, A_sys_shuf, s_sys_shuf, a_sys_shuf, log_pi_old_sa_sys_shuf,
-                        A_glo_shuf, r_glo_shuf):
-
+                        v_target_glo_shuf, A_glo_shuf, r_glo_shuf):
                 # 1. update value network
                 # update usr vnet
                 v_usr_b = self.vnet(s_usr_b, 'usr').squeeze(-1)
