@@ -120,7 +120,8 @@ def sampler(pid, queue, evt, env, policy_usr, policy_sys, batchsz):
 
             # save to queue
             # s^u, a^u, r^u, s'^u, s^s, a^s, r^s, s'^s, t, r_glo
-            buff.push(s_vec.numpy(), a.numpy(), r_usr, s_vec_next.numpy(), next_s_vec.numpy(), next_a.numpy(), r_sys, next_s_vec_next.numpy(), done, r_global)
+            buff.push(s_vec.numpy(), a.numpy(), r_usr, s_vec_next.numpy(), next_s_vec.numpy(), next_a.numpy(), r_sys,
+                      next_s_vec_next.numpy(), done, r_global)
 
             # update per step
             real_traj_len = t
@@ -141,12 +142,12 @@ def sampler(pid, queue, evt, env, policy_usr, policy_sys, batchsz):
 
 class Learner():
 
-    def __init__(self, env_cls, args, cfg, process_num, manager, pre_irl=False, infer=False):
+    def __init__(self, env_cls, args, cfg, process_num, manager, character='sys', pre_irl=False, infer=False):
         self.policy_sys = MultiDiscretePolicy(cfg).to(device=DEVICE)
         self.policy_usr = MultiDiscretePolicy(cfg, 'usr').to(device=DEVICE)
-        self.vnet = HybridValue(cfg).to(device=DEVICE)
         self.rewarder_sys = RewardEstimator(args, cfg, manager, character='sys', pretrain=pre_irl, inference=infer)
         self.rewarder_usr = RewardEstimator(args, cfg, manager, character='usr', pretrain=pre_irl, inference=infer)
+        self.vnet = HybridValue(cfg).to(device=DEVICE)
 
         # initialize envs for each process
         self.env_list = []
@@ -161,16 +162,16 @@ class Learner():
         if not infer:
             self.l2_loss = nn.MSELoss()
             self.multi_entropy_loss = nn.BCEWithLogitsLoss()
-            self.target_vnet = HybridValue(cfg).to(device=DEVICE)
-            self.episode_num = 0
-            self.last_target_update_episode = 0
-            self.target_update_interval = args.interval
 
             self.policy_sys_optim = optim.RMSprop(self.policy_sys.parameters(), lr=args.lr_policy)
             self.policy_usr_optim = optim.RMSprop(self.policy_usr.parameters(), lr=args.lr_policy)
             self.vnet_optim = optim.RMSprop(self.vnet.parameters(), lr=args.lr_vnet, weight_decay=args.weight_decay)
 
         self.gamma = args.gamma
+        self.tau = args.tau  # GAE广义优势估计超参数lambda（此处用tau）
+        self.epsilon = args.epsilon
+        self.update_round = args.update_round  # Epoch num for inner loop of PPO
+
         self.grad_norm_clip = args.clip
         self.optim_batchsz = args.batchsz
         self.save_per_epoch = args.save_per_epoch
@@ -181,28 +182,24 @@ class Learner():
     """
     预训练RewardEstimator模块
     """
+
     # 预训练RE（逆强化学习）
     def train_irl(self, epoch, batchsz):
         batch = self.sample(batchsz)
         self.rewarder_sys.train_irl(batch, epoch)
         self.rewarder_usr.train_irl(batch, epoch)
+
     # 测试RE
     def test_irl(self, epoch, batchsz, best):
         batch = self.sample(batchsz)
-        best_sys = self.rewarder_sys.test_irl(batch, epoch, best)   # best = float('inf')
+        best_sys = self.rewarder_sys.test_irl(batch, epoch, best)  # best = float('inf')
         best_usr = self.rewarder_usr.test_irl(batch, epoch, best)
         return best_sys, best_usr
-
-    """ 
-    更新目标网络
-    """
-    def _update_targets(self):
-        self.target_vnet.load_state_dict(self.vnet.state_dict())
-        logging.info('Updated target network')
 
     """
     测试模块
     """
+
     # 测试：用户vs系统
     def evaluate(self, N):
         logging.info('eval: user 2 system')
@@ -255,6 +252,7 @@ class Learner():
         F1 = 2 * prec * rec / (prec + rec)
         logging.info('inform rec {}, F1 {}'.format(rec, F1))
         logging.info('success {}'.format(np.mean(success_tot)))
+
     # 测试系统智能体：使用基于日程的用户模拟器
     def evaluate_with_agenda(self, env, N):
         logging.info('eval: agenda 2 system')
@@ -307,6 +305,7 @@ class Learner():
         F1 = 2 * prec * rec / (prec + rec)
         logging.info('inform rec {}, F1 {}'.format(rec, F1))
         logging.info('success {}'.format(np.mean(success_tot)))
+
     # 测试用户智能体：使用基于规则的系统智能体
     def evaluate_with_rule(self, env, N):
         logging.info('eval: user 2 rule')
@@ -358,6 +357,57 @@ class Learner():
     """
     训练模块
     """
+
+    # 计算价值函数V和优势函数A
+    def est_adv(self, r, v, mask):
+        """
+        we save a trajectory in continuous space and it reaches the ending of current trajectory when mask=0.
+        :param r: reward, Tensor, [b]
+        :param v: estimated value, Tensor, [b]
+        :param mask: indicates ending for 0 otherwise 1, Tensor, [b]
+        :return: A(s, a), V-target(s), both Tensor
+
+        此函数用于估计优势函数。
+        """
+        batchsz = v.size(0)
+
+        # v_target is worked out by Bellman equation.
+        v_target = torch.Tensor(batchsz).to(device=DEVICE)
+        delta = torch.Tensor(batchsz).to(device=DEVICE)  # TD-error
+        A_sa = torch.Tensor(batchsz).to(device=DEVICE)  # 优势函数
+
+        # 初始化为0
+        prev_v_target = 0
+        prev_v = 0
+        prev_A_sa = 0
+        for t in reversed(range(batchsz)):
+            # mask here indicates a end of trajectory
+            # this value will be treated as the target value of value network.
+            # mask = 0 means the immediate reward is the real V(s) since it's end of trajectory.
+            # formula: V(s_t) = r_t + gamma * V(s_t+1)
+            v_target[t] = r[t] + self.gamma * prev_v_target * mask[t]
+
+            # please refer to : https://arxiv.org/abs/1506.02438
+            # for generalized adavantage estimation
+            # formula: delta(s_t) = r_t + gamma * V(s_t+1) - V(s_t)
+            delta[t] = r[t] + self.gamma * prev_v * mask[t] - v[t]
+
+            # formula: A(s, a) = delta(s_t) + gamma * lamda * A(s_t+1, a_t+1)
+            # here use symbol tau as lambda, but original paper uses symbol lambda.
+            # 此处使用广义优势估计作为优势函数。
+            A_sa[t] = delta[t] + self.gamma * self.tau * prev_A_sa * mask[t]
+
+            # update previous
+            prev_v_target = v_target[t]
+            prev_v = v[t]
+            prev_A_sa = A_sa[t]
+
+        # normalize A_sa
+        A_sa = (A_sa - A_sa.mean()) / A_sa.std()
+
+        return A_sa, v_target
+
+    # 算法总流程
     def update(self, batchsz, epoch, best=None):
         """
         firstly sample batchsz items and then perform optimize algorithms.
@@ -382,15 +432,41 @@ class Learner():
         # batch.reward/batch.mask: ([1], [1]...)
         s_usr = torch.from_numpy(np.stack(batch.state_usr)).to(device=DEVICE)
         a_usr = torch.from_numpy(np.stack(batch.action_usr)).to(device=DEVICE)
-        r_usr = torch.Tensor(np.stack(batch.reward_usr)).to(device=DEVICE)
         s_usr_next = torch.from_numpy(np.stack(batch.state_usr_next)).to(device=DEVICE)
+
         s_sys = torch.from_numpy(np.stack(batch.state_sys)).to(device=DEVICE)
         a_sys = torch.from_numpy(np.stack(batch.action_sys)).to(device=DEVICE)
-        r_sys = torch.Tensor(np.stack(batch.reward_sys)).to(device=DEVICE)
         s_sys_next = torch.from_numpy(np.stack(batch.state_sys_next)).to(device=DEVICE)
+
         ternimal = torch.Tensor(np.stack(batch.mask)).to(device=DEVICE)
         r_glo = torch.Tensor(np.stack(batch.reward_global)).to(device=DEVICE)
         batchsz = s_usr.size(0)
+
+        # 2. update reward estimator
+        inputs_sys = (s_sys, a_sys, s_sys_next)
+        inputs_usr = (s_usr, a_usr, s_usr_next)
+        if backward:  # 若为训练模式
+            self.rewarder_sys.update_irl(inputs_sys, batchsz, epoch)
+            self.rewarder_usr.update_irl(inputs_usr, batchsz, epoch)
+        else:
+            best[1] = self.rewarder_sys.update_irl(inputs_sys, batchsz, epoch, best[1])
+            best[1] = self.rewarder_usr.update_irl(inputs_usr, batchsz, epoch, best[1])
+
+        # 3. compute rewards
+        log_pi_old_sa_sys = self.policy_usr.get_log_prob(s_sys, a_sys).detach()
+        log_pi_old_sa_usr = self.policy_usr.get_log_prob(s_usr, a_usr).detach()
+
+        r_sys = self.rewarder_sys.estimate(s_sys, a_sys, s_sys_next, log_pi_old_sa_sys).detach()
+        r_usr = self.rewarder_usr.estimate(s_usr, a_usr, s_usr_next, log_pi_old_sa_usr).detach()
+
+        # 4. estimate V, A and V_td-target
+        v_sys = self.vnet(s_sys, 'sys').squeeze(-1).detach()
+        v_usr = self.vnet(s_usr, 'usr').squeeze(-1).detach()
+        v_glo = self.vnet((s_usr, s_sys), 'global').squeeze(-1).detach()
+
+        A_sys, v_target_sys = self.est_adv(r_sys, v_sys, ternimal)
+        A_usr, v_target_usr = self.est_adv(r_usr, v_usr, ternimal)
+        A_glo, v_target_glo = self.est_adv(r_glo, v_glo, ternimal)
 
         if not backward:
             reward = r_usr.mean().item() + r_sys.mean().item() + r_glo.mean().item()
@@ -409,122 +485,99 @@ class Learner():
                                                                      r_glo.mean().item()))
 
         # 6. update dialog policy
+        for i in range(self.update_round):
 
-        # 1. shuffle current batch
-        perm = torch.randperm(batchsz)
-        # shuffle the variable for mutliple optimize
-        s_usr_shuf, a_usr_shuf, r_usr_shuf, s_usr_next_shuf, s_sys_shuf, a_sys_shuf, r_sys_shuf, s_sys_next_shuf, terminal_shuf, r_glo_shuf = \
-            s_usr[perm], a_usr[perm], r_usr[perm], s_usr_next[perm], s_sys[perm], a_sys[perm], r_sys[perm], s_sys_next[
-                perm], ternimal[perm], r_glo[perm]
+            # 1. shuffle current batch
+            perm = torch.randperm(batchsz)
 
-        # 2. get mini-batch for optimizing
-        optim_chunk_num = int(np.ceil(batchsz / self.optim_batchsz))
-        # chunk the optim_batch for total batch
-        s_usr_shuf, a_usr_shuf, r_usr_shuf, s_usr_next_shuf, s_sys_shuf, a_sys_shuf, r_sys_shuf, s_sys_next_shuf, terminal_shuf, r_glo_shuf = \
-            torch.chunk(s_usr_shuf, optim_chunk_num), torch.chunk(a_usr_shuf, optim_chunk_num), torch.chunk(r_usr_shuf,
-                                                                                                            optim_chunk_num), torch.chunk(
-                s_usr_next_shuf, optim_chunk_num), \
-            torch.chunk(s_sys_shuf, optim_chunk_num), torch.chunk(a_sys_shuf, optim_chunk_num), torch.chunk(r_sys_shuf,
-                                                                                                            optim_chunk_num), torch.chunk(
-                s_sys_next_shuf, optim_chunk_num), \
-            torch.chunk(terminal_shuf, optim_chunk_num), torch.chunk(r_glo_shuf, optim_chunk_num)
+            v_target_usr_shuf, A_usr_shuf, s_usr_shuf, a_usr_shuf, log_pi_old_sa_usr_shuf, v_target_sys_shuf, A_sys_shuf, s_sys_shuf, a_sys_shuf, log_pi_old_sa_sys_shuf, A_glo_shuf, r_glo_shuf = \
+                v_target_usr[perm], A_usr[perm], s_usr[perm], a_usr[perm], log_pi_old_sa_usr[perm], v_target_sys[perm], \
+                A_sys[perm], s_sys[perm], a_sys[perm], log_pi_old_sa_sys[perm], A_glo[perm], r_glo[perm]
 
-        # 3. iterate all mini-batch to optimize
-        for s_usr_b, a_usr_b, r_usr_b, s_usr_next_b, s_sys_b, a_sys_b, r_sys_b, s_sys_next_b, t_b, r_glo_b in \
-                zip(s_usr_shuf, a_usr_shuf, r_usr_shuf, s_usr_next_shuf, \
-                    s_sys_shuf, a_sys_shuf, r_sys_shuf, s_sys_next_shuf, \
-                    terminal_shuf, r_glo_shuf):
+            # 2. get mini-batch for optimizing
+            optim_chunk_num = int(np.ceil(batchsz / self.optim_batchsz))
+            # chunk the optim_batch for total batch
+            v_target_usr_shuf, A_usr_shuf, s_usr_shuf, a_usr_shuf, log_pi_old_sa_usr_shuf, v_target_sys_shuf, A_sys_shuf, s_sys_shuf, a_sys_shuf, log_pi_old_sa_sys_shuf, A_glo_shuf, r_glo_shuf = \
+                torch.chunk(v_target_usr_shuf, optim_chunk_num), torch.chunk(A_usr_shuf, optim_chunk_num), torch.chunk(
+                    s_usr_shuf, optim_chunk_num), \
+                torch.chunk(a_usr_shuf, optim_chunk_num), torch.chunk(log_pi_old_sa_usr_shuf, optim_chunk_num), \
+                torch.chunk(v_target_sys_shuf, optim_chunk_num), torch.chunk(A_sys_shuf, optim_chunk_num), torch.chunk(
+                    s_sys_shuf, optim_chunk_num), \
+                torch.chunk(a_sys_shuf, optim_chunk_num), torch.chunk(log_pi_old_sa_sys_shuf, optim_chunk_num), \
+                torch.chunk(A_glo_shuf, optim_chunk_num), torch.chunk(r_glo_shuf, optim_chunk_num)
 
-            # 1. update critic network
+            # 3. iterate all mini-batch to optimize
+            for v_target_usr_b, A_usr_b, s_usr_b, a_usr_b, log_pi_old_sa_usr_b, v_target_sys_b, A_sys_b, s_sys_b, a_sys_b, log_pi_old_sa_sys_b, A_glo_b, r_glo_b in \
+                    zip(v_target_usr_shuf, A_usr_shuf, s_usr_shuf, a_usr_shuf, log_pi_old_sa_usr_shuf,
+                        v_target_sys_shuf, A_sys_shuf, s_sys_shuf, a_sys_shuf, log_pi_old_sa_sys_shuf,
+                        A_glo_shuf, r_glo_shuf):
+                # 1. update value network
+                # update usr vnet
+                v_usr_b = self.vnet(s_usr_b, 'usr').squeeze(-1)
+                loss_usr = self.l2_loss(v_usr_b, v_target_usr_b)
+                vnet_usr_loss += loss_usr.item()
 
-            # update usr vnet
-            vals_usr = self.vnet(s_usr_b, 'usr')
-            target_usr = r_usr_b + self.gamma * (1 - t_b) * self.target_vnet(s_usr_next_b, 'usr')
-            loss_usr = self.l2_loss(vals_usr, target_usr)
-            vnet_usr_loss += loss_usr.item()
+                # update sys vnet
+                v_sys_b = self.vnet(s_sys_b, 'sys').squeeze(-1)
+                loss_sys = self.l2_loss(v_sys_b, v_target_sys_b)
+                vnet_sys_loss += loss_sys.item()
 
-            # update sys vnet
-            vals_sys = self.vnet(s_sys_b, 'sys')
-            target_sys = r_sys_b + self.gamma * (1 - t_b) * self.target_vnet(s_sys_next_b, 'sys')
-            loss_sys = self.l2_loss(vals_sys, target_sys)
-            vnet_sys_loss += loss_sys.item()
+                # update global vnet
+                v_glo_b = self.vnet((s_usr_b, s_sys_b), 'global')
+                loss_glo = self.l2_loss(v_glo_b, v_target_glo)
+                vnet_glo_loss += loss_glo.item()
 
-            # update global vnet
-            vals_glo = self.vnet((s_usr_b, s_sys_b), 'global')
-            target_glo = r_glo_b + self.gamma * (1 - t_b) * self.target_vnet((s_usr_next_b, s_sys_next_b), 'global')
-            loss_glo = self.l2_loss(vals_glo, target_glo)
-            vnet_glo_loss += loss_glo.item()
+                self.vnet_optim.zero_grad()
+                loss = loss_usr + loss_sys + loss_glo
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.vnet.parameters(), self.grad_norm_clip)
+                self.vnet_optim.step()
 
-            self.vnet_optim.zero_grad()
-            loss = loss_usr + loss_sys + loss_glo
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(self.vnet.parameters(), self.grad_norm_clip)
-            self.vnet_optim.step()
+                # 2. update policy by PPO
+                # update usr policy
+                self.policy_usr_optim.zero_grad()
+                log_pi_sa_usr = self.policy_usr.get_log_prob(s_usr_b, a_usr_b)  # [b, 1]
+                ratio = (log_pi_sa_usr - log_pi_old_sa_usr).exp().squeeze(-1)  # [b, 1] => [b]
+                surrogate1 = ratio * (A_usr_b + A_glo_b)
+                surrogate2 = torch.clamp(ratio, 1 - self.epsilon, 1 + self.epsilon) * (A_usr_b + A_glo_b)
+                # this is element-wise comparing.
+                # we add negative symbol to convert gradient ascent to gradient descent
+                surrogate = - torch.min(surrogate1, surrogate2).mean()
+                policy_usr_loss += surrogate.item()
 
-            self.episode_num += 1
-            if (self.episode_num - self.last_target_update_episode) / self.target_update_interval >= 1.0:
-                self._update_targets()
-                self.last_target_update_episode = self.episode_num
+                surrogate.backward(retain_graph=True)  # backprop
+                torch.nn.utils.clip_grad_norm(self.policy_usr.parameters(),
+                                              self.grad_norm_clip)  # gradient clipping, for stability
+                self.policy_usr_optim.step()
 
-            # 2. update actor network
+                # update sys policy
+                self.policy_sys_optim.zero_grad()
+                log_pi_sa = self.policy_sys.get_log_prob(s_sys_b, a_sys_b)
+                surrogate1 = ratio * (A_sys_b + A_glo_b)
+                surrogate2 = torch.clamp(ratio, 1 - self.epsilon, 1 + self.epsilon) * (A_sys_b + A_glo_b)
+                surrogate = - torch.min(surrogate1, surrogate2).mean()
+                policy_sys_loss += surrogate.item()
 
-            # estimate advantage using current critic
-            td_error_usr = r_usr_b + self.gamma * (1 - t_b) * self.vnet(s_usr_next_b, 'usr') - self.vnet(s_usr_b, 'usr')
-            td_error_sys = r_sys_b + self.gamma * (1 - t_b) * self.vnet(s_sys_next_b, 'sys') - self.vnet(s_sys_b, 'sys')
-            td_error_glo = r_glo_b + self.gamma * (1 - t_b) * self.vnet((s_usr_next_b, s_sys_next_b),
-                                                                        'global') - self.vnet((s_usr_b, s_sys_b),
-                                                                                              'global')
+                surrogate.backward(retain_graph=True)
+                torch.nn.utils.clip_grad_norm(self.policy_sys.parameters(), self.grad_norm_clip)
+                self.policy_sys_optim.step()
 
-            self.policy_usr_optim.zero_grad()
-            # [b, 1]
-            log_pi_sa = self.policy_usr.get_log_prob(s_usr_b, a_usr_b)
-            # this is element-wise comparing.
-            # we add negative symbol to convert gradient ascent to gradient descent
-            surrogate = - (log_pi_sa * (td_error_usr + td_error_glo)).mean()
-            policy_usr_loss += surrogate.item()
+            vnet_usr_loss /= optim_chunk_num
+            vnet_sys_loss /= optim_chunk_num
+            vnet_glo_loss /= optim_chunk_num
+            policy_usr_loss /= optim_chunk_num
+            policy_sys_loss /= optim_chunk_num
 
-            # backprop
-            surrogate.backward(retain_graph=True)
-            # gradient clipping, for stability
-            torch.nn.utils.clip_grad_norm(self.policy_usr.parameters(), self.grad_norm_clip)
-            # self.lock.acquire() # retain lock to update weights
-            self.policy_usr_optim.step()
-            # self.lock.release() # release lock
+            # 记录loss信息
+            logging.debug('epoch {}, policy: usr {}, sys {}, value network: usr {}, sys {}, global {}'.format
+                          (epoch, policy_usr_loss, policy_sys_loss, vnet_usr_loss, vnet_sys_loss, vnet_glo_loss))
+            self.writer.add_scalar('train/usr_policy_loss', policy_usr_loss, epoch)
+            self.writer.add_scalar('train/sys_policy_loss', policy_sys_loss, epoch)
+            self.writer.add_scalar('train/vnet_usr_loss', vnet_usr_loss, epoch)
+            self.writer.add_scalar('train/vnet_sys_loss', vnet_sys_loss, epoch)
+            self.writer.add_scalar('train/vnet_glo_loss', vnet_glo_loss, epoch)
 
-            self.policy_sys_optim.zero_grad()
-            # [b, 1]
-            log_pi_sa = self.policy_sys.get_log_prob(s_sys_b, a_sys_b)
-            # this is element-wise comparing.
-            # we add negative symbol to convert gradient ascent to gradient descent
-            surrogate = - (log_pi_sa * (td_error_sys + td_error_glo)).mean()
-            policy_sys_loss += surrogate.item()
-
-            # backprop
-            surrogate.backward()
-            # gradient clipping, for stability
-            torch.nn.utils.clip_grad_norm(self.policy_sys.parameters(), self.grad_norm_clip)
-            # self.lock.acquire() # retain lock to update weights
-            self.policy_sys_optim.step()
-            # self.lock.release() # release lock
-
-        vnet_usr_loss /= optim_chunk_num
-        vnet_sys_loss /= optim_chunk_num
-        vnet_glo_loss /= optim_chunk_num
-        policy_usr_loss /= optim_chunk_num
-        policy_sys_loss /= optim_chunk_num
-
-        logging.debug('epoch {}, policy: usr {}, sys {}, value network: usr {}, sys {}, global {}'.format(epoch, \
-                                                                                                          policy_usr_loss,
-                                                                                                          policy_sys_loss,
-                                                                                                          vnet_usr_loss,
-                                                                                                          vnet_sys_loss,
-                                                                                                          vnet_glo_loss))
-        self.writer.add_scalar('train/usr_policy_loss', policy_usr_loss, epoch)
-        self.writer.add_scalar('train/sys_policy_loss', policy_sys_loss, epoch)
-        self.writer.add_scalar('train/vnet_usr_loss', vnet_usr_loss, epoch)
-        self.writer.add_scalar('train/vnet_sys_loss', vnet_sys_loss, epoch)
-        self.writer.add_scalar('train/vnet_glo_loss', vnet_glo_loss, epoch)
-
+        # 保存训练模型
         if (epoch + 1) % self.save_per_epoch == 0:
             self.save(self.save_dir, epoch)
             with open(self.save_dir + '/' + str(epoch) + '.pkl', 'wb') as f:
@@ -536,6 +589,7 @@ class Learner():
     """
     辅助函数模块
     """
+
     # 采样
     def sample(self, batchsz):
         """
@@ -579,6 +633,7 @@ class Learner():
         buff = buff0
 
         return buff.get_batch()
+
     # 保存模型
     def save(self, directory, epoch):
         if not os.path.exists(directory):
@@ -592,6 +647,7 @@ class Learner():
         torch.save(self.vnet.state_dict(), directory + '/vnet/' + str(epoch) + '_vnet.mdl')
 
         logging.info('<<multi agent learner>> epoch {}: saved network to mdl'.format(epoch))
+
     # 加载模型
     def load(self, filename):
 
@@ -606,9 +662,6 @@ class Learner():
         if os.path.exists(policy_sys_mdl):
             self.policy_sys.load_state_dict(torch.load(policy_sys_mdl))
             logging.info('<<dialog policy sys>> loaded checkpoint from file: {}'.format(policy_sys_mdl))
-
-        if not self.infer:
-            self._update_targets()
 
         best_pkl = filename + '.pkl'
         if os.path.exists(best_pkl):

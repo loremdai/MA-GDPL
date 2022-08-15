@@ -28,10 +28,10 @@ class RewardEstimator(object):
         self.save_per_epoch = args.save_per_epoch
         self.save_dir = args.save_dir
 
+        self.bce_loss = nn.BCEWithLogitsLoss()
         self.irl_params = self.irl.parameters()
         self.irl_optim = optim.RMSprop(self.irl_params, lr=args.lr_irl)
         self.irl.eval()
-        self.bce_loss = nn.BCEWithLogitsLoss()
 
         db = DBQuery(args.data_dir, config)
 
