@@ -539,7 +539,7 @@ class Learner():
                 # update usr policy
                 self.policy_usr_optim.zero_grad()
                 log_pi_sa_usr = self.policy_usr.get_log_prob(s_usr_b, a_usr_b)  # [b, 1]
-                ratio = (log_pi_sa_usr - log_pi_old_sa_usr).exp().squeeze(-1)  # [b, 1] => [b]
+                ratio = (log_pi_sa_usr - log_pi_old_sa_usr_b).exp().squeeze(-1)  # [b, 1] => [b]
                 surrogate1 = ratio * (A_usr_b + A_glo_b)
                 surrogate2 = torch.clamp(ratio, 1 - self.epsilon, 1 + self.epsilon) * (A_usr_b + A_glo_b)
                 # this is element-wise comparing.
@@ -554,7 +554,8 @@ class Learner():
 
                 # update sys policy
                 self.policy_sys_optim.zero_grad()
-                log_pi_sa = self.policy_sys.get_log_prob(s_sys_b, a_sys_b)
+                log_pi_sa_sys = self.policy_sys.get_log_prob(s_sys_b, a_sys_b)
+                ratio = (log_pi_sa_sys - log_pi_old_sa_sys_b).exp().squeeze(-1)
                 surrogate1 = ratio * (A_sys_b + A_glo_b)
                 surrogate2 = torch.clamp(ratio, 1 - self.epsilon, 1 + self.epsilon) * (A_sys_b + A_glo_b)
                 surrogate = - torch.min(surrogate1, surrogate2).mean()
