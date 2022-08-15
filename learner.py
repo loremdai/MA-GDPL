@@ -572,13 +572,13 @@ class Learner():
             policy_sys_loss /= optim_chunk_num
 
             # 记录loss信息
-            logging.debug('epoch {}, policy: usr {}, sys {}, value network: usr {}, sys {}, global {}'.format
-                          (epoch, policy_usr_loss, policy_sys_loss, vnet_usr_loss, vnet_sys_loss, vnet_glo_loss))
-            self.writer.add_scalar('train/usr_policy_loss', policy_usr_loss, epoch)
-            self.writer.add_scalar('train/sys_policy_loss', policy_sys_loss, epoch)
-            self.writer.add_scalar('train/vnet_usr_loss', vnet_usr_loss, epoch)
-            self.writer.add_scalar('train/vnet_sys_loss', vnet_sys_loss, epoch)
-            self.writer.add_scalar('train/vnet_glo_loss', vnet_glo_loss, epoch)
+        logging.debug('epoch {}, policy: usr {}, sys {}, value network: usr {}, sys {}, global {}'.format
+                        (epoch, policy_usr_loss, policy_sys_loss, vnet_usr_loss, vnet_sys_loss, vnet_glo_loss))
+        self.writer.add_scalar('train/usr_policy_loss', policy_usr_loss, epoch)
+        self.writer.add_scalar('train/sys_policy_loss', policy_sys_loss, epoch)
+        self.writer.add_scalar('train/vnet_usr_loss', vnet_usr_loss, epoch)
+        self.writer.add_scalar('train/vnet_sys_loss', vnet_sys_loss, epoch)
+        self.writer.add_scalar('train/vnet_glo_loss', vnet_glo_loss, epoch)
 
         # 保存训练模型
         if (epoch + 1) % self.save_per_epoch == 0:
