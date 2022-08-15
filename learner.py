@@ -521,14 +521,12 @@ class Learner():
 
                 # update sys vnet
                 v_sys_b = self.vnet(s_sys_b, 'sys').squeeze(-1)
-                print("v_glo size:{}".format(v_sys_b.size()))
-                print("v_target_glo size:{}".format(v_target_sys_b.size()))
                 loss_sys = self.l2_loss(v_sys_b, v_target_sys_b)
                 vnet_sys_loss += loss_sys.item()
 
                 # update global vnet
                 v_glo_b = self.vnet((s_usr_b, s_sys_b), 'global')
-                loss_glo = self.l2_loss(v_glo_b, v_target_glo)
+                loss_glo = self.l2_loss(v_glo_b, v_target_glo_b)
                 vnet_glo_loss += loss_glo.item()
 
                 self.vnet_optim.zero_grad()
