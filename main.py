@@ -77,6 +77,8 @@ if __name__ == '__main__':
     else:
         raise NotImplementedError('Config of the dataset {} not implemented'.format(args.config))
 
+    manager = DataManager(args.data_dir, config)
+
     init_logging_handler(args.log_dir)
     logging.debug(str(args))
     
@@ -88,8 +90,7 @@ if __name__ == '__main__':
     # 预训练模式
     if args.pretrain:
         logging.debug('pretrain')
-        
-        manager = DataManager(args.data_dir, config)
+
         processes = []
         process_args = (args, manager, config)
 
@@ -126,7 +127,7 @@ if __name__ == '__main__':
         current_time = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
         logging.debug('train {}'.format(current_time))
     
-        agent = Learner(make_env, args, config, args.process)
+        agent = Learner(make_env, args, config, args.process, manager)
         best = agent.load(args.load)
 
         for i in range(args.epoch):
