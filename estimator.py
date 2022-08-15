@@ -271,7 +271,8 @@ class RewardEstimator(object):
 
     # 载入模型（可能要修改）
     def load_irl(self, filename):
-        irl_mdl = filename + '_estimator.mdl'
+        directory, epoch = filename.rsplit('/', 1)
+        irl_mdl = directory + '/usr/' + epoch + '_estimator.mdl'
         if os.path.exists(irl_mdl):
             self.irl.load_state_dict(torch.load(irl_mdl))
             logging.info('<<reward estimator {}>> loaded checkpoint from file: {}'.format(self.character, irl_mdl))

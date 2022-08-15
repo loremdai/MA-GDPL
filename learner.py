@@ -659,8 +659,8 @@ class Learner():
     def load(self, filename):
         directory, epoch = filename.rsplit('/', 1)
 
-        self.rewarder_usr.load_irl(directory + '/usr/')
-        self.rewarder_sys.load_irl(directory + '/sys/')
+        self.rewarder_usr.load_irl(filename)
+        self.rewarder_sys.load_irl(filename)
 
         policy_usr_mdl = directory + '/usr/' + epoch + '_pol.mdl'
         if os.path.exists(policy_usr_mdl):
