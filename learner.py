@@ -525,6 +525,7 @@ class Learner():
                 # update global vnet
                 v_glo_b = self.vnet((s_usr_b, s_sys_b), 'global')
                 print("v_glo size:{}".format(v_glo_b.size()))
+                print("v_target_glo size:{}".format(v_target_glo.size()))
                 loss_glo = self.l2_loss(v_glo_b, v_target_glo)
                 vnet_glo_loss += loss_glo.item()
 
