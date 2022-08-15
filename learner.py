@@ -425,8 +425,6 @@ class Learner():
         # 1. sample data asynchronously
         batch = self.sample(batchsz)
 
-        policy_usr_loss, policy_sys_loss, vnet_usr_loss, vnet_sys_loss, vnet_glo_loss = 0., 0., 0., 0., 0.
-
         # data in batch is : batch.state: ([1, s_dim], [1, s_dim]...)
         # batch.action: ([1, a_dim], [1, a_dim]...)
         # batch.reward/batch.mask: ([1], [1]...)
@@ -509,6 +507,8 @@ class Learner():
                     r_glo_shuf, optim_chunk_num)
 
             # 3. iterate all mini-batch to optimize
+            policy_usr_loss, policy_sys_loss, vnet_usr_loss, vnet_sys_loss, vnet_glo_loss = 0., 0., 0., 0., 0.
+
             for v_target_usr_b, A_usr_b, s_usr_b, a_usr_b, log_pi_old_sa_usr_b, v_target_sys_b, A_sys_b, s_sys_b, a_sys_b, log_pi_old_sa_sys_b, v_target_glo_b, A_glo_b, r_glo_b in \
                     zip(v_target_usr_shuf, A_usr_shuf, s_usr_shuf, a_usr_shuf, log_pi_old_sa_usr_shuf,
                         v_target_sys_shuf, A_sys_shuf, s_sys_shuf, a_sys_shuf, log_pi_old_sa_sys_shuf,

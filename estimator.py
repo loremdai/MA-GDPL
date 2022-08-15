@@ -266,8 +266,7 @@ class RewardEstimator(object):
     def save_irl(self, directory, epoch):
         if not os.path.exists(directory):
             os.makedirs(directory)
-
-        torch.save(self.irl.state_dict(), directory + '/' + str(epoch) + '_estimator.mdl')
+        torch.save(self.irl.state_dict(), directory + '/'+self.character+'/' + str(epoch) + '_estimator.mdl')
         logging.info('<<reward estimator {}>> epoch {}: saved network to mdl'.format(self.character, epoch))
 
     # 载入模型（可能要修改）
