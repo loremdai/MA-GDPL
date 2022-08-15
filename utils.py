@@ -42,6 +42,7 @@ def get_parser():
     parser.add_argument('--gamma', type=float, default=0.99, help='Discounted factor')
 
     # 下面一项为新增项
+    parser.add_argument('--epsilon', type=float, default=0.2, help='Clip epsilon of ratio r(theta)')
     parser.add_argument('--tau', type=float, default=0.95, help='Generalized advantage estimation')
     parser.add_argument('--clip', type=float, default=10, help='Gradient clipping')
     parser.add_argument('--interval', type=int, default=400, help='Update interval of target network')
