@@ -638,12 +638,16 @@ class Learner():
         return buff.get_batch()
 
     # 保存模型
-    def save(self, directory, epoch):
+    def save(self, directory, epoch, rl_only=False):
         if not os.path.exists(directory):
             os.makedirs(directory)
             os.makedirs(directory + '/usr')
             os.makedirs(directory + '/sys')
             os.makedirs(directory + '/vnet')
+
+        if not rl_only:
+            self.rewarder_usr.save_irl(directory + '/usr/', epoch)
+            self.rewarder_sys.save_irl(directory + '/sys/', epoch)
 
         torch.save(self.policy_usr.state_dict(), directory + '/usr/' + str(epoch) + '_pol.mdl')
         torch.save(self.policy_sys.state_dict(), directory + '/sys/' + str(epoch) + '_pol.mdl')
@@ -653,8 +657,10 @@ class Learner():
 
     # 加载模型
     def load(self, filename):
-
         directory, epoch = filename.rsplit('/', 1)
+
+        self.rewarder_usr.load_irl(directory + '/usr/')
+        self.rewarder_sys.load_irl(directory + '/sys/')
 
         policy_usr_mdl = directory + '/usr/' + epoch + '_pol.mdl'
         if os.path.exists(policy_usr_mdl):
@@ -671,5 +677,5 @@ class Learner():
             with open(best_pkl, 'rb') as f:
                 best = pickle.load(f)
         else:
-            best = float('-inf')
+            best = [float('inf'),float('inf'),float('-inf'),float('-inf')]
         return best
