@@ -450,7 +450,7 @@ class Learner():
             self.rewarder_usr.update_irl(inputs_usr, batchsz, epoch)
         else:
             best[1] = self.rewarder_sys.update_irl(inputs_sys, batchsz, epoch, best[1])
-            best[1] = self.rewarder_usr.update_irl(inputs_usr, batchsz, epoch, best[1])
+            best[2] = self.rewarder_usr.update_irl(inputs_usr, batchsz, epoch, best[2])
 
         # 3. compute rewards
         log_pi_old_sa_sys = self.policy_sys.get_log_prob(s_sys, a_sys).detach()
@@ -472,9 +472,9 @@ class Learner():
             reward = r_usr.mean().item() + r_sys.mean().item() + r_glo.mean().item()
             logging.debug('validation, epoch {}, reward {}'.format(epoch, reward))
             self.writer.add_scalar('train/reward', reward, epoch)
-            if reward > best:
+            if reward > best[3]:
                 logging.info('best model saved')
-                best = reward
+                best[3] = reward
                 self.save(self.save_dir, 'best')
             with open(self.save_dir + '/best.pkl', 'wb') as f:
                 pickle.dump(best, f)
@@ -677,5 +677,5 @@ class Learner():
             with open(best_pkl, 'rb') as f:
                 best = pickle.load(f)
         else:
-            best = [float('inf'),float('inf'),float('-inf'),float('-inf')]
+            best = [float('-inf'),float('-inf'),float('-inf'),float('-inf')]
         return best
