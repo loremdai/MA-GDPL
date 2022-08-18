@@ -109,7 +109,7 @@ if __name__ == '__main__':
         logging.debug('test')
         logging.disable(logging.DEBUG)
     
-        agent = Learner(make_env, args, config, 1, infer=True)
+        agent = Learner(make_env, args, config, 1, manager, infer=True)
         agent.load(args.load)
 
         # 测试：用户vs系统
