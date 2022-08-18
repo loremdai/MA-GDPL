@@ -42,7 +42,7 @@ def worker_policy_usr(args, manager, config):
 # 新增项：预训练RE
 def worker_estimator(args, manager, config, make_env):
     init_logging_handler(args.log_dir, '_estimator')
-    agent = Learner(make_env, args, config, 0, manager, pre_irl=True)
+    agent = Learner(make_env, args, config, args.process, manager, pre_irl=True)
     agent.load(args.save_dir+'/best')
     best = float('inf')
     for e in range(args.epoch):
