@@ -262,7 +262,7 @@ class RewardEstimator(object):
         reward = (weight - log_pi).squeeze(-1)
         return reward
 
-    # 保存模型（可能要修改）
+    # 保存模型
     def save_irl(self, directory, epoch):
         if not os.path.exists(directory):
             os.makedirs(directory)
@@ -271,7 +271,7 @@ class RewardEstimator(object):
         torch.save(self.irl.state_dict(), directory + '/'+self.character+'/' + str(epoch) + '_estimator.mdl')
         logging.info('<<reward estimator {}>> epoch {}: saved network to mdl'.format(self.character, epoch))
 
-    # 载入模型（可能要修改）
+    # 载入模型
     def load_irl(self, filename):
         directory, epoch = filename.rsplit('/', 1)
         irl_mdl = directory + '/'+self.character+'/' + epoch + '_estimator.mdl'
