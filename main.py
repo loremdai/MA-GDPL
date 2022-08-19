@@ -94,8 +94,7 @@ if __name__ == '__main__':
 
         processes = []
         process_args = (args, manager, config)
-        # 预训练：系统/用户端智能体
-        worker_estimator(args, manager, config, make_env)
+
         # 预训练：系统智能体
         processes.append(mp.Process(target=worker_policy_sys, args=process_args))
         # 预训练：用户智能体
@@ -104,6 +103,8 @@ if __name__ == '__main__':
             p.start()
         for p in processes:
             p.join()
+        # 预训练：系统/用户端智能体
+        worker_estimator(args, manager, config, make_env)
 
     # 测试模式
     elif args.test:
@@ -123,6 +124,7 @@ if __name__ == '__main__':
         # 测试用户智能体：使用Rule-based系统智能体
         env = make_env_rule(args.data_dir, config)
         agent.evaluate_with_rule(env, args.test_case)
+
     # 训练模式
     else:
         current_time = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
