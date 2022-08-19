@@ -737,12 +737,6 @@ class Learner():
 
     # 保存模型
     def save(self, directory, epoch, rl_only=False):
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-            os.makedirs(directory + '/sys')
-            os.makedirs(directory + '/usr')
-            os.makedirs(directory + '/vnet')
-
         if not rl_only:
             self.rewarder_usr.save_irl(directory, epoch)
             self.rewarder_sys.save_irl(directory, epoch)

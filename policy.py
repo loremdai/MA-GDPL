@@ -136,6 +136,9 @@ class Policy(object):
     def save(self, directory, epoch):
         if not os.path.exists(directory):
             os.makedirs(directory)
+            os.makedirs(directory + '/sys')
+            os.makedirs(directory + '/usr')
+            os.makedirs(directory + '/vnet')
 
         torch.save(self.policy.state_dict(), directory + '/' + str(epoch) + '_pol.mdl')
         logging.info('<<dialog policy {}>> epoch {}: saved network to mdl'.format(self.character, epoch))
