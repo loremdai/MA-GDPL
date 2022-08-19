@@ -88,7 +88,7 @@ if __name__ == '__main__':
     except RuntimeError:
         pass
 
-    # 预训练模式a
+    # 预训练模式
     if args.pretrain:
         logging.debug('pretrain')
 
