@@ -255,7 +255,6 @@ class Learner():
             for v_target_sys_b, s_sys_b, v_target_usr_b, s_usr_b, v_target_glo_b in zip(v_target_sys_shuf, s_sys_shuf,
                                                                                         v_target_usr_shuf, s_usr_shuf,
                                                                                         v_target_glo_shuf):
-                self.vnet_optim.zero_grad()
                 # update vnet sys
                 v_sys_b = self.vnet(s_sys_b, 'sys').squeeze(-1)
                 loss_sys = self.l2_loss(v_sys_b, v_target_sys_b)
