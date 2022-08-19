@@ -12,6 +12,7 @@ from rlmodule import AIRL
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+
 class RewardEstimator(object):
     def __init__(self, args, config, manager, character, pretrain=False, inference=False):
 
@@ -97,7 +98,7 @@ class RewardEstimator(object):
         real_loss, gen_loss = 0., 0.
         for s, a, next_s in zip(s_chunk, a_chunk, next_s_chunk):
             try:
-                data = self.irl_iter.next() # data为数据集的数据
+                data = self.irl_iter.next()  # data为数据集的数据
             except StopIteration:
                 self.irl_iter = iter(self.data_train)
                 data = self.irl_iter.next()
@@ -266,15 +267,17 @@ class RewardEstimator(object):
     def save_irl(self, directory, epoch):
         if not os.path.exists(directory):
             os.makedirs(directory)
-            os.makedirs(directory + '/usr')
             os.makedirs(directory + '/sys')
-        torch.save(self.irl.state_dict(), directory + '/'+self.character+'/' + str(epoch) + '_estimator.mdl')
+            os.makedirs(directory + '/usr')
+            os.makedirs(directory + '/vnet')
+
+        torch.save(self.irl.state_dict(), directory + '/' + self.character + '/' + str(epoch) + '_estimator.mdl')
         logging.info('<<reward estimator {}>> epoch {}: saved network to mdl'.format(self.character, epoch))
 
     # 载入模型
     def load_irl(self, filename):
         directory, epoch = filename.rsplit('/', 1)
-        irl_mdl = directory + '/'+self.character+'/' + epoch + '_estimator.mdl'
+        irl_mdl = directory + '/' + self.character + '/' + epoch + '_estimator.mdl'
         if os.path.exists(irl_mdl):
             self.irl.load_state_dict(torch.load(irl_mdl))
             logging.info('<<reward estimator {}>> loaded checkpoint from file: {}'.format(self.character, irl_mdl))

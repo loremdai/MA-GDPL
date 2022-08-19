@@ -273,10 +273,15 @@ class Learner():
                 self.vnet_optim.zero_grad()
                 value_loss = loss_usr + loss_sys + loss_glo
                 value_loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.vnet.parameters(), self.grad_norm_clip)
                 self.vnet_optim.step()
 
+            vnet_usr_loss /= optim_chunk_num
+            vnet_sys_loss /= optim_chunk_num
+            vnet_glo_loss /= optim_chunk_num
             value_loss /= optim_chunk_num
-            logging.debug('<<dialog policy>> epoch {}, iteration {}, loss {}'.format(epoch, i, value_loss))
+            logging.debug('<<Hybrid Vnet> epoch {}, iteration {}, value network: usr {}, sys {}, global {}, total {}'\
+                          .format(epoch, i, vnet_usr_loss, vnet_sys_loss, vnet_glo_loss, value_loss))
 
         if value_loss < best:
             logging.info('<<dialog policy>> best model saved')
@@ -734,8 +739,8 @@ class Learner():
     def save(self, directory, epoch, rl_only=False):
         if not os.path.exists(directory):
             os.makedirs(directory)
-            os.makedirs(directory + '/usr')
             os.makedirs(directory + '/sys')
+            os.makedirs(directory + '/usr')
             os.makedirs(directory + '/vnet')
 
         if not rl_only:
