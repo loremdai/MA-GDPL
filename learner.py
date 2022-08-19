@@ -281,8 +281,8 @@ class Learner():
 
             if value_loss < best:
                 logging.info('<<dialog policy>> best model saved')
-            best = value_loss  # 记录该损失为best
-            self.save(self.save_dir, 'best', True)  # 保存最佳模型
+                best = value_loss  # 记录该损失为best
+                self.save(self.save_dir, 'best', True)  # 保存最佳模型
             # 每隔XX轮保存一次模型
             if (epoch + 1) % self.save_per_epoch == 0:
                 self.save(self.save_dir, epoch, True)
