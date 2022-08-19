@@ -52,12 +52,6 @@ class RewardEstimator(object):
             self.irl_iter = iter(self.data_train)
             self.irl_iter_valid = iter(self.data_valid)
 
-    # 计算KL散度
-    def kl_divergence(self, mu, logvar, istrain):
-        klds = -0.5 * (1 + logvar - mu.pow(2) - logvar.exp()).sum()
-        beta = min(self.step / self.anneal, 1) if istrain else 1
-        return beta * klds
-
     # 分别计算并返回真实经验、模拟经验的loss
     def irl_loop(self, data_real, data_gen):
         s_real, a_real, next_s_real = to_device(data_real)
