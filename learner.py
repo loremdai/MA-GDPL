@@ -190,11 +190,105 @@ class Learner():
         self.rewarder_usr.train_irl(batch, epoch)
 
     # 测试RE
-    def test_irl(self, epoch, batchsz, best):
+    def test_irl(self, epoch, batchsz, best0, best1):
         batch = self.sample(batchsz)
-        best_sys = self.rewarder_sys.test_irl(batch, epoch, best)  # best = float('inf')
-        best_usr = self.rewarder_usr.test_irl(batch, epoch, best)
+        best_sys = self.rewarder_sys.test_irl(batch, epoch, best0)  # best = float('inf')
+        best_usr = self.rewarder_usr.test_irl(batch, epoch, best1)
         return best_sys, best_usr
+
+    # 预训练价值网络
+    def imit_value(self, epoch, batchsz, best):
+        self.vnet.train()
+
+        batch = self.sample(batchsz)
+        s_sys = torch.from_numpy(np.stack(batch.state_sys)).to(device=DEVICE)
+        a_sys = torch.from_numpy(np.stack(batch.action_sys)).to(device=DEVICE)
+        next_s_sys = torch.from_numpy(np.stack(batch.state_sys_next)).to(device=DEVICE)
+        batchsz_sys = s_sys.size(0)
+
+        s_usr = torch.from_numpy(np.stack(batch.state_usr)).to(device=DEVICE)
+        a_usr = torch.from_numpy(np.stack(batch.action_usr)).to(device=DEVICE)
+        next_s_usr = torch.from_numpy(np.stack(batch.state_usr_next)).to(device=DEVICE)
+        batchsz_usr = s_usr.size(0)
+
+        r_glo = torch.Tensor(np.stack(batch.reward_global)).to(device=DEVICE)
+        mask = torch.Tensor(np.stack(batch.mask)).to(device=DEVICE)
+
+        # sys part
+        v_sys = self.vnet(s_sys, 'sys').squeeze(-1).detach()
+        log_pi_old_sa_sys = self.policy_sys.get_log_prob(s_sys, a_sys).detach()
+        r_sys = self.rewarder_sys.estimate(s_sys, a_sys, next_s_sys, log_pi_old_sa_sys).detach()
+        A_sys, v_target_sys = self.est_adv(r_sys, v_sys, mask)
+
+        # usr part
+        v_usr = self.vnet(s_usr, 'usr').squeeze(-1).detach()
+        log_pi_old_sa_usr = self.policy_usr.get_log_prob(s_usr, a_usr).detach()
+        r_usr = self.rewarder_usr.estimate(s_usr, a_usr, next_s_usr, log_pi_old_sa_usr).detach()
+        A_usr, v_target_usr = self.est_adv(r_usr, v_usr, mask)
+
+        # glo part
+        v_glo = self.vnet((s_usr, s_sys), 'global').squeeze(-1).detach()
+        A_glo, v_target_glo = self.est_adv(r_glo, v_glo, mask)
+
+        for i in range(self.update_round):
+            perm = torch.randperm(batchsz)
+            v_target_sys_shuf, s_sys_shuf, v_target_usr_shuf, s_usr_shuf, v_target_glo_shuf = v_target_sys[perm], s_sys[
+                perm], \
+                                                                                              v_target_usr[perm], s_sys[
+                                                                                                  perm], v_target_glo[
+                                                                                                  perm]
+            optim_chunk_num = int(np.ceil(batchsz / self.optim_batchsz))
+            v_target_sys_shuf, s_sys_shuf, v_target_usr_shuf, s_usr_shuf, v_target_glo_shuf = torch.chunk(
+                v_target_sys_shuf,
+                optim_chunk_num), \
+                                                                                              torch.chunk(s_sys_shuf,
+                                                                                                          optim_chunk_num), \
+                                                                                              torch.chunk(
+                                                                                                  v_target_usr_shuf,
+                                                                                                  optim_chunk_num), \
+                                                                                              torch.chunk(s_usr_shuf,
+                                                                                                          optim_chunk_num), \
+                                                                                              torch.chunk(s_usr_shuf,
+                                                                                                          optim_chunk_num)
+
+            vnet_sys_loss, vnet_usr_loss, vnet_glo_loss, value_loss = 0., 0., 0., 0.
+            for v_target_sys_b, s_sys_b, v_target_usr_b, s_usr_b, v_target_glo_b in zip(v_target_sys_shuf, s_sys_shuf,
+                                                                                        v_target_usr_shuf, s_usr_shuf,
+                                                                                        v_target_glo_shuf):
+                self.vnet_optim.zero_grad()
+                # update vnet sys
+                v_sys_b = self.vnet(s_sys_b, 'sys').squeeze(-1)
+                loss_sys = self.l2_loss(v_sys_b, v_target_sys_b)
+                vnet_sys_loss += loss_sys.item()
+
+                # update vnet usr
+                v_usr_b = self.vnet(s_usr_b, 'sys').squeeze(-1)
+                loss_usr = self.l2_loss(v_usr_b, v_target_sys_b)
+                vnet_usr_loss += loss_usr.item()
+
+                # update vnet global
+                v_glo_b = self.vnet((s_usr_b, s_sys_b), 'global').squeeze(-1)
+                loss_glo = self.l2_loss(v_glo_b, v_target_glo_b)
+                vnet_glo_loss += loss_glo.item()
+
+                self.vnet_optim.zero_grad()
+                value_loss = loss_usr + loss_sys + loss_glo
+                value_loss.backward()
+                self.vnet_optim.step()
+
+            value_loss /= optim_chunk_num
+            logging.debug('<<dialog policy>> epoch {}, iteration {}, loss {}'.format(epoch, i, value_loss))
+
+            if value_loss < best:
+                logging.info('<<dialog policy>> best model saved')
+            best = value_loss  # 记录该损失为best
+            self.save(self.save_dir, 'best', True)  # 保存最佳模型
+            # 每隔XX轮保存一次模型
+            if (epoch + 1) % self.save_per_epoch == 0:
+                self.save(self.save_dir, epoch, True)
+            self.vnet.eval()  # 关闭训练模式
+
+        return best  # 返回最佳（最小）损失ds
 
     """
     测试模块
@@ -572,13 +666,13 @@ class Learner():
             policy_sys_loss /= optim_chunk_num
 
             # 记录loss信息
-        logging.debug('epoch {}, policy: usr {}, sys {}, value network: usr {}, sys {}, global {}'.format
-                        (epoch, policy_usr_loss, policy_sys_loss, vnet_usr_loss, vnet_sys_loss, vnet_glo_loss))
-        self.writer.add_scalar('train/usr_policy_loss', policy_usr_loss, epoch)
-        self.writer.add_scalar('train/sys_policy_loss', policy_sys_loss, epoch)
-        self.writer.add_scalar('train/vnet_usr_loss', vnet_usr_loss, epoch)
-        self.writer.add_scalar('train/vnet_sys_loss', vnet_sys_loss, epoch)
-        self.writer.add_scalar('train/vnet_glo_loss', vnet_glo_loss, epoch)
+            logging.debug('epoch {}, policy: usr {}, sys {}, value network: usr {}, sys {}, global {}'.format
+                          (epoch, policy_usr_loss, policy_sys_loss, vnet_usr_loss, vnet_sys_loss, vnet_glo_loss))
+            self.writer.add_scalar('train/usr_policy_loss', policy_usr_loss, epoch)
+            self.writer.add_scalar('train/sys_policy_loss', policy_sys_loss, epoch)
+            self.writer.add_scalar('train/vnet_usr_loss', vnet_usr_loss, epoch)
+            self.writer.add_scalar('train/vnet_sys_loss', vnet_sys_loss, epoch)
+            self.writer.add_scalar('train/vnet_glo_loss', vnet_glo_loss, epoch)
 
         # 保存训练模型
         if (epoch + 1) % self.save_per_epoch == 0:
@@ -677,5 +771,6 @@ class Learner():
             with open(best_pkl, 'rb') as f:
                 best = pickle.load(f)
         else:
-            best = [float('-inf'),float('-inf'),float('-inf'),float('-inf')]
+            # irl_sys, irl_usr, value, policy_sys, policy_usr
+            best = [float('inf'), float('inf'), float('inf'), float('-inf'), float('-inf')]
         return best
