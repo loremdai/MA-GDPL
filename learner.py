@@ -234,7 +234,7 @@ class Learner():
             perm = torch.randperm(batchsz)
             v_target_sys_shuf, s_sys_shuf, v_target_usr_shuf, s_usr_shuf, v_target_glo_shuf = v_target_sys[perm], s_sys[
                 perm], \
-                                                                                              v_target_usr[perm], s_sys[
+                                                                                              v_target_usr[perm], s_usr[
                                                                                                   perm], v_target_glo[
                                                                                                   perm]
             optim_chunk_num = int(np.ceil(batchsz / self.optim_batchsz))
@@ -248,7 +248,7 @@ class Learner():
                                                                                                   optim_chunk_num), \
                                                                                               torch.chunk(s_usr_shuf,
                                                                                                           optim_chunk_num), \
-                                                                                              torch.chunk(s_usr_shuf,
+                                                                                              torch.chunk(v_target_glo_shuf,
                                                                                                           optim_chunk_num)
 
             vnet_sys_loss, vnet_usr_loss, vnet_glo_loss, value_loss = 0., 0., 0., 0.
