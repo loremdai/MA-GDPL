@@ -215,19 +215,19 @@ class Learner():
         mask = torch.Tensor(np.stack(batch.mask)).to(device=DEVICE)
 
         # sys part
-        v_sys = self.vnet(s_sys, 'sys').squeeze(-1).detach()
+        v_sys = self.vnet(s_sys, 'sys').detach()
         log_pi_old_sa_sys = self.policy_sys.get_log_prob(s_sys, a_sys).detach()
         r_sys = self.rewarder_sys.estimate(s_sys, a_sys, next_s_sys, log_pi_old_sa_sys).detach()
         A_sys, v_target_sys = self.est_adv(r_sys, v_sys, mask)
 
         # usr part
-        v_usr = self.vnet(s_usr, 'usr').squeeze(-1).detach()
+        v_usr = self.vnet(s_usr, 'usr').detach()
         log_pi_old_sa_usr = self.policy_usr.get_log_prob(s_usr, a_usr).detach()
         r_usr = self.rewarder_usr.estimate(s_usr, a_usr, next_s_usr, log_pi_old_sa_usr).detach()
         A_usr, v_target_usr = self.est_adv(r_usr, v_usr, mask)
 
         # glo part
-        v_glo = self.vnet((s_usr, s_sys), 'global').squeeze(-1).detach()
+        v_glo = self.vnet((s_usr, s_sys), 'global').detach()
         A_glo, v_target_glo = self.est_adv(r_glo, v_glo, mask)
 
         for i in range(self.update_round):
@@ -609,12 +609,12 @@ class Learner():
                         v_target_glo_shuf, A_glo_shuf, r_glo_shuf):
                 # 1. update value network
                 # update usr vnet
-                v_usr_b = self.vnet(s_usr_b, 'usr').squeeze(-1)
+                v_usr_b = self.vnet(s_usr_b, 'usr')
                 loss_usr = self.l2_loss(v_usr_b, v_target_usr_b)
                 vnet_usr_loss += loss_usr.item()
 
                 # update sys vnet
-                v_sys_b = self.vnet(s_sys_b, 'sys').squeeze(-1)
+                v_sys_b = self.vnet(s_sys_b, 'sys')
                 loss_sys = self.l2_loss(v_sys_b, v_target_sys_b)
                 vnet_sys_loss += loss_sys.item()
 
