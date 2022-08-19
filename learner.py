@@ -262,7 +262,7 @@ class Learner():
                 vnet_sys_loss += loss_sys.item()
 
                 # update vnet usr
-                v_usr_b = self.vnet(s_usr_b, 'sys').squeeze(-1)
+                v_usr_b = self.vnet(s_usr_b, 'usr').squeeze(-1)
                 loss_usr = self.l2_loss(v_usr_b, v_target_sys_b)
                 vnet_usr_loss += loss_usr.item()
 
