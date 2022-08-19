@@ -60,7 +60,7 @@ class Policy(object):
             self.evaluator = MultiWozEvaluator(args.data_dir)
 
         # 超参数设置：
-        self.save_dir = args.save_dir + '/' + character if pre else args.save_dir
+        self.save_dir = args.save_dir
         self.save_per_epoch = args.save_per_epoch
         self.optim_batchsz = args.batchsz
         self.gamma = args.gamma
@@ -140,7 +140,7 @@ class Policy(object):
             os.makedirs(directory + '/usr')
             os.makedirs(directory + '/vnet')
 
-        torch.save(self.policy.state_dict(), directory + '/' + str(epoch) + '_pol.mdl')
+        torch.save(self.policy.state_dict(), directory + '/' + self.character + '/' + str(epoch) + '_pol.mdl')
         logging.info('<<dialog policy {}>> epoch {}: saved network to mdl'.format(self.character, epoch))
     # 载入
     def load(self, filename):
