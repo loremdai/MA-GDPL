@@ -278,14 +278,14 @@ class Learner():
             value_loss /= optim_chunk_num
             logging.debug('<<dialog policy>> epoch {}, iteration {}, loss {}'.format(epoch, i, value_loss))
 
-            if value_loss < best:
-                logging.info('<<dialog policy>> best model saved')
-                best = value_loss  # 记录该损失为best
-                self.save(self.save_dir, 'best', True)  # 保存最佳模型
-            # 每隔XX轮保存一次模型
-            if (epoch + 1) % self.save_per_epoch == 0:
-                self.save(self.save_dir, epoch, True)
-            self.vnet.eval()  # 关闭训练模式
+        if value_loss < best:
+            logging.info('<<dialog policy>> best model saved')
+            best = value_loss  # 记录该损失为best
+            self.save(self.save_dir, 'best', True)  # 保存最佳模型
+        # 每隔XX轮保存一次模型
+        if (epoch + 1) % self.save_per_epoch == 0:
+            self.save(self.save_dir, epoch, True)
+        self.vnet.eval()  # 关闭训练模式
 
         return best  # 返回最佳（最小）损失ds
 
