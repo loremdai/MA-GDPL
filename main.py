@@ -103,7 +103,7 @@ if __name__ == '__main__':
             p.start()
         for p in processes:
             p.join()
-        # 预训练：系统/用户端智能体
+        # 预训练：系统/用户端智能
         worker_estimator(args, manager, config, make_env)
 
     # 测试模式
