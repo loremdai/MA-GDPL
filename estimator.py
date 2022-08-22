@@ -35,7 +35,6 @@ class RewardEstimator(object):
         self.irl.eval()
 
         db = DBQuery(args.data_dir, config)
-
         # 预训练模式：切分3个数据集 -> 放入迭代器中。
         if pretrain:
             self.print_per_batch = args.print_per_batch
@@ -59,7 +58,7 @@ class RewardEstimator(object):
 
         # train with real data
         weight_real = self.irl(s_real, a_real, next_s_real)
-        loss_real = -weight_real.mean()
+        loss_real = -weight_real.mean()  # 梯度上升，因此real为负，gen为正。
 
         # train with generated data
         weight = self.irl(s, a, next_s)
@@ -244,7 +243,7 @@ class RewardEstimator(object):
                 self.save_irl(self.save_dir, 'best')
             return best
 
-    # 使用reward estimator推断（输出）reward
+    # 推断reward
     def estimate(self, s, a, next_s, log_pi):
         """
         infer the reward of state action pair with the estimator

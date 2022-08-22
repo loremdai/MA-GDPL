@@ -194,6 +194,7 @@ class Learner():
         batch = self.sample(batchsz)
         best_sys = self.rewarder_sys.test_irl(batch, epoch, best0)  # best = float('inf')
         best_usr = self.rewarder_usr.test_irl(batch, epoch, best1)
+
         return best_sys, best_usr
 
     # 预训练价值网络

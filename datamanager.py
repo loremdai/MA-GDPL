@@ -428,7 +428,6 @@ class DataManager():
         
     def create_dataset_policy(self, part, batchsz, cfg, db, character='sys'):
         assert part in ['train', 'valid', 'test']
-        logging.debug('start loading {}'.format(part))
         
         if character == 'sys':
             file_dir = self.data_dir_new + '/' + part + '_sys.pt'
@@ -446,9 +445,32 @@ class DataManager():
         dataset = Dataset_Policy(new_s, new_a)
         dataloader = data.DataLoader(dataset, batchsz, True)
         
-        logging.debug('finish loading {}'.format(part))
+        logging.debug('finish loading policy {}'.format(part))
         return dataloader
             
+    def create_dataset_irl(self, part, batchsz, cfg, db, character):
+        assert part in['train','valid','test']
+
+        if character == 'sys':
+            file_dir = self.data_dir_new + '/' + part + '_sys.pt'
+        elif character == 'usr':
+            file_dir = self.data_dir_new + '/' + part + '_usr.pt'
+        else:
+            raise NotImplementedError('Unknown character {}'.format(character))
+
+        s, a, _, next_s, _ = torch.load(file_dir)  # s,a,r,s',t
+        new_s, new_a, new_next_s = [], [], []
+        for state, action, next_state in zip(s, a, next_s):
+            if action.nonzero().size(0):
+                new_s.append(state)
+                new_a.append(action)
+                new_next_s.append(next_state)
+        dataset = DatasetIrl(new_s, new_a, new_next_s)
+        dataloader = data.DataLoader(dataset, batchsz, True)
+
+        logging.debug('finish loading irl {}'.format(part))
+        return dataloader
+
     def create_dataset_vnet(self, part, batchsz, cfg, db):
         assert part in ['train', 'valid', 'test']
         logging.debug('start loading {}'.format(part))
@@ -472,29 +494,7 @@ class DataManager():
         logging.debug('finish loading {}'.format(part))
         return dataloader_sys, dataloader_usr, dataloader_global
 
-    def create_dataset_irl(self, part, batchsz, cfg, db, character):
-        assert part in['train','valid','test']
-        logging.debug('start loading {}'.format(part))
 
-        if character == 'sys':
-            file_dir = self.data_dir_new + '/' + part + '_sys.pt'
-        elif character == 'usr':
-            file_dir = self.data_dir_new + '/' + part + '_usr.pt'
-        else:
-            raise NotImplementedError('Unknown character {}'.format(character))
-
-        s, a, _, next_s, *_ = torch.load(file_dir)
-        new_s, new_a, new_next_s = [], [], []
-        for state, action, next_state in zip(s, a, next_s):
-            if action.nonzero().size(0):
-                new_s.append(state)
-                new_a.append(action)
-                new_next_s.append(next_state)
-        dataset = DatasetIrl(s, a, next_s)
-        dataloader = data.DataLoader(dataset, batchsz, True)
-
-        logging.debug('finish loading irl {}'.format(part))
-        return dataloader
 
 class Dataset_Policy(data.Dataset):
     def __init__(self, s, a):
@@ -507,6 +507,22 @@ class Dataset_Policy(data.Dataset):
         a = self.a[index]
         return s, a
     
+    def __len__(self):
+        return self.num_total
+
+class DatasetIrl(data.Dataset):
+    def __init__(self, s_s, a_s, next_s_s):
+        self.s_s = s_s
+        self.a_s = a_s
+        self.next_s_s = next_s_s
+        self.num_total = len(s_s)
+
+    def __getitem__(self, index):
+        s = self.s_s[index]
+        a = self.a_s[index]
+        next_s = self.next_s_s[index]
+        return s, a, next_s
+
     def __len__(self):
         return self.num_total
 
@@ -547,21 +563,5 @@ class Dataset_Vnet_G(data.Dataset):
         t = self.t[index]
         return s_usr, s_sys, r, next_s_usr, next_s_sys, t
     
-    def __len__(self):
-        return self.num_total
-
-class DatasetIrl(data.Dataset):
-    def __init__(self, s_s, a_s, next_s_s):
-        self.s_s = s_s
-        self.a_s = a_s
-        self.next_s_s = next_s_s
-        self.num_total = len(s_s)
-
-    def __getitem__(self, index):
-        s = self.s_s[index]
-        a = self.a_s[index]
-        next_s = self.next_s_s[index]
-        return s, a, next_s
-
     def __len__(self):
         return self.num_total

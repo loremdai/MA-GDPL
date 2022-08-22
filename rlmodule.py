@@ -141,7 +141,7 @@ class AIRL(nn.Module):
     label: 1 for real, 0 for generated
     """
 
-    def __init__(self, cfg, gamma, character='sys'):
+    def __init__(self, cfg, gamma, character):
         super(AIRL, self).__init__()
 
         self.gamma = gamma
