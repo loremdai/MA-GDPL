@@ -472,7 +472,7 @@ class DataManager():
         logging.debug('finish loading {}'.format(part))
         return dataloader_sys, dataloader_usr, dataloader_global
 
-    def create_dataset_irl(self, part, batchsz, cfg, db, character='sys'):
+    def create_dataset_irl(self, part, batchsz, cfg, db, character):
         assert part in['train','valid','test']
         logging.debug('start loading {}'.format(part))
 

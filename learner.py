@@ -258,6 +258,7 @@ class Learner():
                 # update vnet sys
                 v_sys_b = self.vnet(s_sys_b, 'sys').squeeze(-1)
                 loss_sys = self.l2_loss(v_sys_b, v_target_sys_b)
+                # loss = (v_b - v_target_b).pow(2).mean()
                 vnet_sys_loss += loss_sys.item()
 
                 # update vnet usr
@@ -670,8 +671,10 @@ class Learner():
             policy_sys_loss /= optim_chunk_num
 
             # 记录loss信息
-            logging.debug('epoch {}, policy: usr {}, sys {}, value network: usr {}, sys {}, global {}'.format
-                          (epoch, policy_usr_loss, policy_sys_loss, vnet_usr_loss, vnet_sys_loss, vnet_glo_loss))
+            logging.debug('epoch {}, iteration {}, policy: usr {}, sys {}, value network: usr {}, sys {}, global {}'.format
+                          (epoch, i, policy_usr_loss, policy_sys_loss, vnet_usr_loss, vnet_sys_loss, vnet_glo_loss))
+            logging.debug('epoch {}, iteration {}, value network: usr {}, sys {}, global {}'.format
+                          (epoch, i, vnet_usr_loss, vnet_sys_loss, vnet_glo_loss))
             self.writer.add_scalar('train/usr_policy_loss', policy_usr_loss, epoch)
             self.writer.add_scalar('train/sys_policy_loss', policy_sys_loss, epoch)
             self.writer.add_scalar('train/vnet_usr_loss', vnet_usr_loss, epoch)

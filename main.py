@@ -115,11 +115,11 @@ if __name__ == '__main__':
         agent.load(args.load)
 
         # 测试：用户vs系统
-        # agent.evaluate(args.test_case)
+        agent.evaluate(args.test_case)
         
-        # # 测试系统智能体：使用Agenda-based用户模拟器
-        # env = make_env_agenda(args.data_dir, config)
-        # agent.evaluate_with_agenda(env, args.test_case)
+        # 测试系统智能体：使用Agenda-based用户模拟器
+        env = make_env_agenda(args.data_dir, config)
+        agent.evaluate_with_agenda(env, args.test_case)
 
         # 测试用户智能体：使用Rule-based系统智能体
         env = make_env_rule(args.data_dir, config)
