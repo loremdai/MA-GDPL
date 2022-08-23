@@ -672,8 +672,8 @@ class Learner():
             policy_sys_loss /= optim_chunk_num
 
             # 记录loss信息
-            logging.debug('epoch {}, iteration {}, policy: usr {}, sys {}, value network: usr {}, sys {}, global {}'.format
-                          (epoch, i, policy_usr_loss, policy_sys_loss, vnet_usr_loss, vnet_sys_loss, vnet_glo_loss))
+            logging.debug('epoch {}, iteration {}, policy: usr {}, sys {}'.format
+                          (epoch, i, policy_usr_loss, policy_sys_loss))
             logging.debug('epoch {}, iteration {}, value: usr {}, sys {}, global {}'.format
                           (epoch, i, vnet_usr_loss, vnet_sys_loss, vnet_glo_loss))
             self.writer.add_scalar('train/usr_policy_loss', policy_usr_loss, epoch)
