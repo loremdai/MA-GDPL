@@ -674,7 +674,7 @@ class Learner():
             # 记录loss信息
             logging.debug('epoch {}, iteration {}, policy: usr {}, sys {}, value network: usr {}, sys {}, global {}'.format
                           (epoch, i, policy_usr_loss, policy_sys_loss, vnet_usr_loss, vnet_sys_loss, vnet_glo_loss))
-            logging.debug('epoch {}, iteration {}, value network: usr {}, sys {}, global {}'.format
+            logging.debug('epoch {}, iteration {}, value: usr {}, sys {}, global {}'.format
                           (epoch, i, vnet_usr_loss, vnet_sys_loss, vnet_glo_loss))
             self.writer.add_scalar('train/usr_policy_loss', policy_usr_loss, epoch)
             self.writer.add_scalar('train/sys_policy_loss', policy_sys_loss, epoch)
@@ -751,8 +751,8 @@ class Learner():
             self.rewarder_usr.save_irl(directory, epoch)
             self.rewarder_sys.save_irl(directory, epoch)
 
-        torch.save(self.policy_usr.state_dict(), directory + '/usr/' + str(epoch) + '_pol.mdl')
         torch.save(self.policy_sys.state_dict(), directory + '/sys/' + str(epoch) + '_pol.mdl')
+        torch.save(self.policy_usr.state_dict(), directory + '/usr/' + str(epoch) + '_pol.mdl')
         torch.save(self.vnet.state_dict(), directory + '/vnet/' + str(epoch) + '_vnet.mdl')
 
         logging.info('<<multi agent learner>> epoch {}: saved network to mdl'.format(epoch))
@@ -761,18 +761,18 @@ class Learner():
     def load(self, filename):
         directory, epoch = filename.rsplit('/', 1)
 
-        self.rewarder_usr.load_irl(filename)
         self.rewarder_sys.load_irl(filename)
-
-        policy_usr_mdl = directory + '/usr/' + epoch + '_pol.mdl'
-        if os.path.exists(policy_usr_mdl):
-            self.policy_usr.load_state_dict(torch.load(policy_usr_mdl))
-            logging.info('<<dialog policy usr>> loaded checkpoint from file: {}'.format(policy_usr_mdl))
+        self.rewarder_usr.load_irl(filename)
 
         policy_sys_mdl = directory + '/sys/' + epoch + '_pol.mdl'
         if os.path.exists(policy_sys_mdl):
             self.policy_sys.load_state_dict(torch.load(policy_sys_mdl))
             logging.info('<<dialog policy sys>> loaded checkpoint from file: {}'.format(policy_sys_mdl))
+
+        policy_usr_mdl = directory + '/usr/' + epoch + '_pol.mdl'
+        if os.path.exists(policy_usr_mdl):
+            self.policy_usr.load_state_dict(torch.load(policy_usr_mdl))
+            logging.info('<<dialog policy usr>> loaded checkpoint from file: {}'.format(policy_usr_mdl))
 
         best_pkl = filename + '.pkl'
         if os.path.exists(best_pkl):
