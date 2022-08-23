@@ -518,8 +518,8 @@ class Learner():
         """
         backward = True if best is None else False
         if backward:
-            self.policy_usr.train()
             self.policy_sys.train()
+            self.policy_usr.train()
             self.vnet.train()
 
         # 1. sample data asynchronously
@@ -528,13 +528,13 @@ class Learner():
         # data in batch is : batch.state: ([1, s_dim], [1, s_dim]...)
         # batch.action: ([1, a_dim], [1, a_dim]...)
         # batch.reward/batch.mask: ([1], [1]...)
-        s_usr = torch.from_numpy(np.stack(batch.state_usr)).to(device=DEVICE)
-        a_usr = torch.from_numpy(np.stack(batch.action_usr)).to(device=DEVICE)
-        s_usr_next = torch.from_numpy(np.stack(batch.state_usr_next)).to(device=DEVICE)
-
         s_sys = torch.from_numpy(np.stack(batch.state_sys)).to(device=DEVICE)
         a_sys = torch.from_numpy(np.stack(batch.action_sys)).to(device=DEVICE)
         s_sys_next = torch.from_numpy(np.stack(batch.state_sys_next)).to(device=DEVICE)
+
+        s_usr = torch.from_numpy(np.stack(batch.state_usr)).to(device=DEVICE)
+        a_usr = torch.from_numpy(np.stack(batch.action_usr)).to(device=DEVICE)
+        s_usr_next = torch.from_numpy(np.stack(batch.state_usr_next)).to(device=DEVICE)
 
         ternimal = torch.Tensor(np.stack(batch.mask)).to(device=DEVICE)
         r_glo = torch.Tensor(np.stack(batch.reward_global)).to(device=DEVICE)
@@ -639,15 +639,15 @@ class Learner():
                 # update usr policy
                 self.policy_usr_optim.zero_grad()
                 log_pi_sa_usr = self.policy_usr.get_log_prob(s_usr_b, a_usr_b)  # [b, 1]
-                ratio = (log_pi_sa_usr - log_pi_old_sa_usr_b).exp().squeeze(-1)  # [b, 1] => [b]
-                surrogate1 = ratio * (A_usr_b + A_glo_b)
-                surrogate2 = torch.clamp(ratio, 1 - self.epsilon, 1 + self.epsilon) * (A_usr_b + A_glo_b)
+                ratio_usr = (log_pi_sa_usr - log_pi_old_sa_usr_b).exp().squeeze(-1)  # [b, 1] => [b]
+                surrogate1_usr = ratio_usr * (A_usr_b + A_glo_b)
+                surrogate2_usr = torch.clamp(ratio_usr, 1 - self.epsilon, 1 + self.epsilon) * (A_usr_b + A_glo_b)
                 # this is element-wise comparing.
                 # we add negative symbol to convert gradient ascent to gradient descent
-                surrogate = - torch.min(surrogate1, surrogate2).mean()
-                policy_usr_loss += surrogate.item()
+                surrogate_usr = - torch.min(surrogate1_usr, surrogate2_usr).mean()
+                policy_usr_loss += surrogate_usr.item()
 
-                surrogate.backward(retain_graph=True)  # backprop
+                surrogate_usr.backward()  # backprop
                 torch.nn.utils.clip_grad_norm(self.policy_usr.parameters(),
                                               self.grad_norm_clip)  # gradient clipping, for stability
                 self.policy_usr_optim.step()
@@ -655,13 +655,13 @@ class Learner():
                 # update sys policy
                 self.policy_sys_optim.zero_grad()
                 log_pi_sa_sys = self.policy_sys.get_log_prob(s_sys_b, a_sys_b)
-                ratio = (log_pi_sa_sys - log_pi_old_sa_sys_b).exp().squeeze(-1)
-                surrogate1 = ratio * (A_sys_b + A_glo_b)
-                surrogate2 = torch.clamp(ratio, 1 - self.epsilon, 1 + self.epsilon) * (A_sys_b + A_glo_b)
-                surrogate = - torch.min(surrogate1, surrogate2).mean()
-                policy_sys_loss += surrogate.item()
+                ratio_sys = (log_pi_sa_sys - log_pi_old_sa_sys_b).exp().squeeze(-1)
+                surrogate1_sys = ratio_sys * (A_sys_b + A_glo_b)
+                surrogate2_sys = torch.clamp(ratio_sys, 1 - self.epsilon, 1 + self.epsilon) * (A_sys_b + A_glo_b)
+                surrogate_sys = - torch.min(surrogate1_sys, surrogate2_sys).mean()
+                policy_sys_loss += surrogate_sys.item()
 
-                surrogate.backward(retain_graph=True)
+                surrogate_sys.backward()
                 torch.nn.utils.clip_grad_norm(self.policy_sys.parameters(), self.grad_norm_clip)
                 self.policy_sys_optim.step()
 
@@ -780,6 +780,6 @@ class Learner():
                 best = pickle.load(f)
                 print(best)
         else:
-            # irl_sys, irl_usr, value, policy_sys, policy_usr
-            best = [float('inf'), float('inf'), float('inf'), float('-inf'), float('-inf')]
+            # unknown, sys_reward_loss, usr_reward_loss, total_reward
+            best = [float('inf'), float('inf'), float('inf'), float('-inf')]
         return best
