@@ -534,7 +534,7 @@ class Learner():
 
         s_usr = torch.from_numpy(np.stack(batch.state_usr)).to(device=DEVICE)
         a_usr = torch.from_numpy(np.stack(batch.action_usr)).to(device=DEVICE)
-        r_usr = torch.from_numpy(np.stack(batch.reward_usr)).to(device=DEVICE)
+        r_usr = torch.Tensor(np.stack(batch.reward_usr)).to(device=DEVICE)
         s_usr_next = torch.from_numpy(np.stack(batch.state_usr_next)).to(device=DEVICE)
 
         ternimal = torch.Tensor(np.stack(batch.mask)).to(device=DEVICE)
@@ -579,7 +579,6 @@ class Learner():
                 pickle.dump(best, f)
             return best
         else:
-            print("r_usr: {}",format(r_usr.mean().item()))
             logging.debug(
                 'epoch {}, reward: usr {}, sys {}, global {}'.format(epoch, r_usr.mean().item(), r_sys.mean().item(),
                                                                      r_glo.mean().item()))
