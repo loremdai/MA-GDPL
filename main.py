@@ -44,11 +44,11 @@ def worker_estimator(args, manager, config, make_env):
     init_logging_handler(args.log_dir, '_estimator')
     agent = Learner(make_env, args, config, args.process, manager, pre_irl=True)
     agent.load(args.save_dir+'/best')
-    best0, best1, best2 = float('inf'), float('inf'), float('inf')
+    best0, best1 = float('inf'), float('inf')
     for e in range(args.epoch):
         agent.train_irl(e, args.batchsz_traj)
-        best0, best1 = agent.test_irl(e, args.batchsz, best0, best1)
-        best2 = agent.imit_value(e, args.batchsz_traj, best2)
+        best0 = agent.test_irl(e, args.batchsz, best0)
+        # best1 = agent.imit_value(e, args.batchsz_traj, best1)
 
 """
 环境区
@@ -118,12 +118,12 @@ if __name__ == '__main__':
         # agent.evaluate(args.test_case)
         
         # 测试系统智能体：使用Agenda-based用户模拟器
-        env = make_env_agenda(args.data_dir, config)
-        agent.evaluate_with_agenda(env, args.test_case)
+        # env = make_env_agenda(args.data_dir, config)
+        # agent.evaluate_with_agenda(env, args.test_case)
 
         # 测试用户智能体：使用Rule-based系统智能体
-        # env = make_env_rule(args.data_dir, config)
-        # agent.evaluate_with_rule(env, args.test_case)
+        env = make_env_rule(args.data_dir, config)
+        agent.evaluate_with_rule(env, args.test_case)
 
     # 训练模式
     else:
