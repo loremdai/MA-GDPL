@@ -579,6 +579,7 @@ class Learner():
                 pickle.dump(best, f)
             return best
         else:
+            print("r_usr: {}",format(r_usr.mean().item()))
             logging.debug(
                 'epoch {}, reward: usr {}, sys {}, global {}'.format(epoch, r_usr.mean().item(), r_sys.mean().item(),
                                                                      r_glo.mean().item()))
