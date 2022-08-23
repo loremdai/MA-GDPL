@@ -29,7 +29,6 @@ class RewardEstimator(object):
         self.save_per_epoch = args.save_per_epoch
         self.save_dir = args.save_dir
 
-        self.bce_loss = nn.BCEWithLogitsLoss()
         self.irl_params = self.irl.parameters()
         self.irl_optim = optim.RMSprop(self.irl_params, lr=args.lr_irl)
         self.irl.eval()
@@ -41,6 +40,7 @@ class RewardEstimator(object):
             self.data_train = manager.create_dataset_irl('train', args.batchsz, config, db, character)
             self.data_valid = manager.create_dataset_irl('valid', args.batchsz, config, db, character)
             self.data_test = manager.create_dataset_irl('test', args.batchsz, config, db, character)
+
             self.irl_iter = iter(self.data_train)
             self.irl_iter_valid = iter(self.data_valid)
             self.irl_iter_test = iter(self.data_test)
@@ -58,11 +58,12 @@ class RewardEstimator(object):
 
         # train with real data
         weight_real = self.irl(s_real, a_real, next_s_real)
-        loss_real = -weight_real.mean()  # 梯度上升，因此real为负，gen为正。
+        loss_real = -weight_real.mean()
 
         # train with generated data
         weight = self.irl(s, a, next_s)
         loss_gen = weight.mean()
+
         return loss_real, loss_gen
 
     # 训练模型

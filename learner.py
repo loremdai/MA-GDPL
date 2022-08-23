@@ -778,6 +778,7 @@ class Learner():
         if os.path.exists(best_pkl):
             with open(best_pkl, 'rb') as f:
                 best = pickle.load(f)
+                print(best)
         else:
             # irl_sys, irl_usr, value, policy_sys, policy_usr
             best = [float('inf'), float('inf'), float('inf'), float('-inf'), float('-inf')]
