@@ -749,8 +749,8 @@ class Learner():
             os.makedirs(directory + '/vnet')
 
         if not rl_only:
-            # self.rewarder_usr.save_irl(directory, epoch)
             self.rewarder_sys.save_irl(directory, epoch)
+            # self.rewarder_usr.save_irl(directory, epoch)
 
         torch.save(self.policy_sys.state_dict(), directory + '/sys/' + str(epoch) + '_pol.mdl')
         torch.save(self.policy_usr.state_dict(), directory + '/usr/' + str(epoch) + '_pol.mdl')
