@@ -751,7 +751,7 @@ class Learner():
 
         if not rl_only:
             self.rewarder_sys.save_irl(directory, epoch)
-            # self.rewarder_usr.save_irl(directory, epoch)
+            self.rewarder_usr.save_irl(directory, epoch)
 
         torch.save(self.policy_sys.state_dict(), directory + '/sys/' + str(epoch) + '_pol.mdl')
         torch.save(self.policy_usr.state_dict(), directory + '/usr/' + str(epoch) + '_pol.mdl')
@@ -764,7 +764,7 @@ class Learner():
         directory, epoch = filename.rsplit('/', 1)
 
         self.rewarder_sys.load_irl(filename)
-        # self.rewarder_usr.load_irl(filename)
+        self.rewarder_usr.load_irl(filename)
 
         policy_sys_mdl = directory + '/sys/' + epoch + '_pol.mdl'
         if os.path.exists(policy_sys_mdl):
