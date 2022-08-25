@@ -437,16 +437,33 @@ class DataManager():
             raise NotImplementedError('Unknown character {}'.format(character))
         
         s, a, *_ = torch.load(file_dir)
-        new_s, new_a = [], []
-        for state, action in zip(s, a):
-            if action.nonzero().size(0):
-                new_s.append(state)
-                new_a.append(action)
-        dataset = Dataset_Policy(new_s, new_a)
+        dataset = Dataset_Policy(s, a)
         dataloader = data.DataLoader(dataset, batchsz, True)
         
         logging.debug('finish loading policy {}'.format(part))
         return dataloader
+
+    # def create_dataset_policy(self, part, batchsz, cfg, db, character='sys'):
+    #     assert part in ['train', 'valid', 'test']
+    #
+    #     if character == 'sys':
+    #         file_dir = self.data_dir_new + '/' + part + '_sys.pt'
+    #     elif character == 'usr':
+    #         file_dir = self.data_dir_new + '/' + part + '_usr.pt'
+    #     else:
+    #         raise NotImplementedError('Unknown character {}'.format(character))
+    #
+    #     s, a, *_ = torch.load(file_dir)
+    #     new_s, new_a = [], []
+    #     for state, action in zip(s, a):
+    #         if action.nonzero().size(0):
+    #             new_s.append(state)
+    #             new_a.append(action)
+    #     dataset = Dataset_Policy(new_s, new_a)
+    #     dataloader = data.DataLoader(dataset, batchsz, True)
+    #
+    #     logging.debug('finish loading policy {}'.format(part))
+    #     return dataloader
             
     def create_dataset_irl(self, part, batchsz, cfg, db, character):
         assert part in['train','valid','test']
@@ -459,13 +476,13 @@ class DataManager():
             raise NotImplementedError('Unknown character {}'.format(character))
 
         s, a, _, next_s, _ = torch.load(file_dir)  # s,a,r,s',t
-        new_s, new_a, new_next_s = [], [], []
-        for state, action, next_state in zip(s, a, next_s):
-            if action.nonzero().size(0):
-                new_s.append(state)
-                new_a.append(action)
-                new_next_s.append(next_state)
-        dataset = DatasetIrl(new_s, new_a, new_next_s)
+        # new_s, new_a, new_next_s = [], [], []
+        # for state, action, next_state in zip(s, a, next_s):
+        #     if action.nonzero().size(0):
+        #         new_s.append(state)
+        #         new_a.append(action)
+        #         new_next_s.append(next_state)
+        dataset = DatasetIrl(s, a, next_s)
         dataloader = data.DataLoader(dataset, batchsz, True)
 
         logging.debug('finish loading irl {}'.format(part))
