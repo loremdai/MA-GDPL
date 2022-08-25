@@ -190,10 +190,10 @@ class Learner():
         self.rewarder_usr.train_irl(batch, epoch)
 
     # 测试RE
-    def test_irl(self, epoch, batchsz, best):
+    def test_irl(self, epoch, batchsz, best0, best1):
         batch = self.sample(batchsz)
-        best_sys = self.rewarder_sys.test_irl(batch, epoch, best)  # best = float('inf')
-        best_usr = self.rewarder_usr.test_irl(batch, epoch, best)
+        best_sys = self.rewarder_sys.test_irl(batch, epoch, best0)  # best = float('inf')
+        best_usr = self.rewarder_usr.test_irl(batch, epoch, best1)
 
         return best_sys, best_usr
 
