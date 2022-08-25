@@ -48,7 +48,7 @@ def worker_estimator(args, manager, config, make_env):
     for e in range(args.epoch):
         agent.train_irl(e, args.batchsz_traj)
         best0 = agent.test_irl(e, args.batchsz, best0)
-        # best1 = agent.imit_value(e, args.batchsz_traj, best1)
+        best1 = agent.imit_value(e, args.batchsz_traj, best1)
 
 """
 环境区
