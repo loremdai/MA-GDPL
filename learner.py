@@ -568,7 +568,7 @@ class Learner():
         v_glo = self.vnet((s_usr, s_sys), 'global').squeeze(-1).detach()
 
         A_sys, v_target_sys = self.est_adv(r_sys, v_sys, ternimal)
-        A_usr = r_usr + self.gamma * (1 - ternimal) * self.vnet(s_usr_next, 'usr') - self.vnet(s_usr, 'usr')
+        A_usr = r_usr + self.gamma * (1 - ternimal) * self.vnet(s_usr_next, 'usr').detach() - self.vnet(s_usr, 'usr').detach()
         _, v_target_usr = self.est_adv(r_usr, v_usr, ternimal)
         A_glo, v_target_glo = self.est_adv(r_glo, v_glo, ternimal)
 
