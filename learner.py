@@ -558,7 +558,7 @@ class Learner():
         log_pi_old_sa_usr = self.policy_usr.get_log_prob(s_usr, a_usr).detach()
 
         r_sys = self.rewarder_sys.estimate(s_sys, a_sys, s_sys_next, log_pi_old_sa_sys).detach()
-        r_usr = self.rewarder_usr.estimate(s_usr, a_usr, s_usr_next, log_pi_old_sa_usr).detach()
+        r_usr = self.rewarder_sys.estimate(s_sys, a_sys, s_sys_next, log_pi_old_sa_sys).detach()
 
         # 4. estimate V, A and V_td-target
         v_sys = self.vnet(s_sys, 'sys').squeeze(-1).detach()
