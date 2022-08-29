@@ -568,10 +568,8 @@ class Learner():
         v_glo = self.vnet((s_usr, s_sys), 'global').squeeze(-1).detach()
 
         A_sys, v_target_sys = self.est_adv(r_sys, v_sys, ternimal)
-        A_test = r_usr + self.gamma * (1 - ternimal) * self.vnet(s_usr_next, 'usr') - self.vnet(s_usr, 'usr')
-        print("A_test size {}".format(A_test.size()))
-        A_usr, v_target_usr = self.est_adv(r_usr, v_usr, ternimal)
-        print("A_usr size {}".format(A_usr.size()))
+        A_usr = r_usr + self.gamma * (1 - ternimal) * self.vnet(s_usr_next, 'usr') - self.vnet(s_usr, 'usr')
+        _, v_target_usr = self.est_adv(r_usr, v_usr, ternimal)
         A_glo, v_target_glo = self.est_adv(r_glo, v_glo, ternimal)
 
         if not backward:
