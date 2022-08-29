@@ -565,6 +565,7 @@ class Learner():
         r_usr2 = self.rewarder_usr.estimate(s_usr, a_usr, s_usr_next, log_pi_old_sa_usr).detach()
         print("r_sys2 {}".format(r_sys2[90]))
         print("r_usr2 {}".format(r_usr2[90]))
+        #
 
         # 4. estimate V, A and V_td-target
         v_sys = self.vnet(s_sys, 'sys').squeeze(-1).detach()
