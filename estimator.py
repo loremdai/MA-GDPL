@@ -193,7 +193,6 @@ class RewardEstimator(object):
         next_s_chunk = torch.chunk(input_next_s, turns)
 
         real_loss, gen_loss = 0., 0.
-
         for s, a, next_s in zip(s_chunk, a_chunk, next_s_chunk):
             # 训练模式
             if backward:

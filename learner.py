@@ -543,14 +543,14 @@ class Learner():
         r_glo = torch.Tensor(np.stack(batch.reward_global)).to(device=DEVICE)
 
         # 2. update reward estimator
-        inputs_sys = (s_sys, a_sys, s_sys_next)
-        inputs_usr = (s_usr, a_usr, s_usr_next)
-        if backward:  # 若为训练模式
-            self.rewarder_sys.update_irl(inputs_sys, batchsz_sys, epoch)
-            self.rewarder_usr.update_irl(inputs_usr, batchsz_usr, epoch)
-        else:
-            best[1] = self.rewarder_sys.update_irl(inputs_sys, batchsz_sys, epoch, best[1])
-            best[2] = self.rewarder_usr.update_irl(inputs_usr, batchsz_usr, epoch, best[2])
+        # inputs_sys = (s_sys, a_sys, s_sys_next)
+        # inputs_usr = (s_usr, a_usr, s_usr_next)
+        # if backward:  # 若为训练模式
+        #     self.rewarder_sys.update_irl(inputs_sys, batchsz_sys, epoch)
+        #     self.rewarder_usr.update_irl(inputs_usr, batchsz_usr, epoch)
+        # else:
+        #     best[1] = self.rewarder_sys.update_irl(inputs_sys, batchsz_sys, epoch, best[1])
+        #     best[2] = self.rewarder_usr.update_irl(inputs_usr, batchsz_usr, epoch, best[2])
 
         # 3. compute rewards
         log_pi_old_sa_sys = self.policy_sys.get_log_prob(s_sys, a_sys).detach()
