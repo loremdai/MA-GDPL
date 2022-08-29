@@ -535,7 +535,7 @@ class Learner():
         r_sys = torch.Tensor(np.stack(batch.reward_sys)).to(device=DEVICE)
         batchsz_sys = s_sys.size(0)
         print("r_sys")
-        print(r_sys[:50])
+        print(r_sys[100:200])
 
         s_usr = torch.from_numpy(np.stack(batch.state_usr)).to(device=DEVICE)
         a_usr = torch.from_numpy(np.stack(batch.action_usr)).to(device=DEVICE)
@@ -543,7 +543,7 @@ class Learner():
         r_usr = torch.Tensor(np.stack(batch.reward_usr)).to(device=DEVICE)
         batchsz_usr = s_usr.size(0)
         print("r_usr")
-        print(r_usr[:50])
+        print(r_usr[100:200])
 
         ternimal = torch.Tensor(np.stack(batch.mask)).to(device=DEVICE)
         r_glo = torch.Tensor(np.stack(batch.reward_global)).to(device=DEVICE)
