@@ -619,17 +619,17 @@ class Learner():
                 # update usr vnet
                 self.vnet_optim.zero_grad()
                 v_usr_b = self.vnet(s_usr_b, 'usr').squeeze(-1)
-                loss_usr = self.l2_loss(v_usr_b, v_target_usr_b)
+                loss_usr = (v_usr_b - v_target_usr_b).pow(2).mean()
                 vnet_usr_loss += loss_usr.item()
 
                 # update sys vnet
                 v_sys_b = self.vnet(s_sys_b, 'sys').squeeze(-1)
-                loss_sys = self.l2_loss(v_sys_b, v_target_sys_b)
+                loss_sys = (v_sys_b - v_target_sys_b).pow(2).mean()
                 vnet_sys_loss += loss_sys.item()
 
                 # update global vnet
                 v_glo_b = self.vnet((s_usr_b, s_sys_b), 'global').squeeze(-1)
-                loss_glo = self.l2_loss(v_glo_b, v_target_glo_b)
+                loss_glo = (v_glo_b - v_target_glo_b).pow(2).mean()
                 vnet_glo_loss += loss_glo.item()
 
                 loss = loss_usr + loss_sys + loss_glo
