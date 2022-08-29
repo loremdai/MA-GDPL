@@ -542,6 +542,7 @@ class Learner():
 
         ternimal = torch.Tensor(np.stack(batch.mask)).to(device=DEVICE)
         r_glo = torch.Tensor(np.stack(batch.reward_global)).to(device=DEVICE)
+        print("r_glo size {}".format(r_glo.size()))
 
         # 2. update reward estimator
         inputs_sys = (s_sys, a_sys, s_sys_next)
@@ -559,6 +560,7 @@ class Learner():
 
         r_sys = self.rewarder_sys.estimate(s_sys, a_sys, s_sys_next, log_pi_old_sa_sys).detach()
         r_usr = self.rewarder_sys.estimate(s_sys, a_sys, s_sys_next, log_pi_old_sa_sys).detach()
+        print("r_usr size {}".format(r_usr.size()))
 
         # 4. estimate V, A and V_td-target
         v_sys = self.vnet(s_sys, 'sys').squeeze(-1).detach()
