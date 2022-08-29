@@ -784,8 +784,10 @@ class Learner():
         if os.path.exists(best_pkl):
             with open(best_pkl, 'rb') as f:
                 best = pickle.load(f)
-                print(best)
         else:
             # unknown, sys_reward_loss, usr_reward_loss, total_reward
             best = [float('inf'), float('inf'), float('inf'), float('-inf')]
+
+        print("best:")
+        print(best)
         return best
