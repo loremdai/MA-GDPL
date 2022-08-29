@@ -562,7 +562,7 @@ class Learner():
         log_pi_old_sa_usr = self.policy_usr.get_log_prob(s_usr, a_usr).detach()
 
         r_sys2 = self.rewarder_sys.estimate(s_sys, a_sys, s_sys_next, log_pi_old_sa_sys).detach()
-        r_usr2 = self.rewarder_usr.estimate(s_sys, a_sys, s_sys_next, log_pi_old_sa_sys).detach()
+        r_usr2 = self.rewarder_usr.estimate(s_usr, a_usr, s_usr_next, log_pi_old_sa_usr).detach()
         print("r_sys2 {}".format(r_sys2[90]))
         print("r_usr2 {}".format(r_usr2[90]))
 
