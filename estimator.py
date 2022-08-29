@@ -37,9 +37,9 @@ class RewardEstimator(object):
         # 预训练模式：切分3个数据集 -> 放入迭代器中。
         if pretrain:
             self.print_per_batch = args.print_per_batch
-            self.data_train = manager.create_dataset_irl('train', args.batchsz, config, db, character)
-            self.data_valid = manager.create_dataset_irl('valid', args.batchsz, config, db, character)
-            self.data_test = manager.create_dataset_irl('test', args.batchsz, config, db, character)
+            self.data_train = manager.create_dataset_irl('train', args.batchsz, config, db, self.character)
+            self.data_valid = manager.create_dataset_irl('valid', args.batchsz, config, db, self.character)
+            self.data_test = manager.create_dataset_irl('test', args.batchsz, config, db, self.character)
 
             self.irl_iter = iter(self.data_train)
             self.irl_iter_valid = iter(self.data_valid)

@@ -532,25 +532,25 @@ class Learner():
         s_sys = torch.from_numpy(np.stack(batch.state_sys)).to(device=DEVICE)
         a_sys = torch.from_numpy(np.stack(batch.action_sys)).to(device=DEVICE)
         s_sys_next = torch.from_numpy(np.stack(batch.state_sys_next)).to(device=DEVICE)
+        batchsz_sys = s_sys.size(0)
 
         s_usr = torch.from_numpy(np.stack(batch.state_usr)).to(device=DEVICE)
         a_usr = torch.from_numpy(np.stack(batch.action_usr)).to(device=DEVICE)
-        # r_usr = torch.Tensor(np.stack(batch.reward_usr)).to(device=DEVICE)
         s_usr_next = torch.from_numpy(np.stack(batch.state_usr_next)).to(device=DEVICE)
+        batchsz_usr = s_usr.size(0)
 
         ternimal = torch.Tensor(np.stack(batch.mask)).to(device=DEVICE)
         r_glo = torch.Tensor(np.stack(batch.reward_global)).to(device=DEVICE)
-        batchsz = s_usr.size(0)
 
         # 2. update reward estimator
         inputs_sys = (s_sys, a_sys, s_sys_next)
         inputs_usr = (s_usr, a_usr, s_usr_next)
         if backward:  # 若为训练模式
-            self.rewarder_sys.update_irl(inputs_sys, batchsz, epoch)
-            self.rewarder_usr.update_irl(inputs_usr, batchsz, epoch)
+            self.rewarder_sys.update_irl(inputs_sys, batchsz_sys, epoch)
+            self.rewarder_usr.update_irl(inputs_usr, batchsz_usr, epoch)
         else:
-            best[1] = self.rewarder_sys.update_irl(inputs_sys, batchsz, epoch, best[1])
-            best[2] = self.rewarder_usr.update_irl(inputs_usr, batchsz, epoch, best[2])
+            best[1] = self.rewarder_sys.update_irl(inputs_sys, batchsz_sys, epoch, best[1])
+            best[2] = self.rewarder_usr.update_irl(inputs_usr, batchsz_usr, epoch, best[2])
 
         # 3. compute rewards
         log_pi_old_sa_sys = self.policy_sys.get_log_prob(s_sys, a_sys).detach()
@@ -569,7 +569,7 @@ class Learner():
         A_glo, v_target_glo = self.est_adv(r_glo, v_glo, ternimal)
 
         if not backward:
-            reward = r_usr.mean().item() + r_sys.mean().item() + r_glo.mean().item()
+            reward = r_sys.mean().item() + r_usr.mean().item() + r_glo.mean().item()
             logging.debug('validation, epoch {}, reward {}'.format(epoch, reward))
             self.writer.add_scalar('train/reward', reward, epoch)
             if reward > best[3]:
@@ -581,7 +581,7 @@ class Learner():
             return best
         else:
             logging.debug(
-                'epoch {}, reward: usr {}, sys {}, global {}'.format(epoch, r_usr.mean().item(), r_sys.mean().item(),
+                'epoch {}, reward: sys {}, usr {}, global {}'.format(epoch, r_sys.mean().item(), r_usr.mean().item(),
                                                                      r_glo.mean().item()))
 
         # 6. update dialog policy
@@ -617,6 +617,7 @@ class Learner():
                         v_target_glo_shuf, A_glo_shuf, r_glo_shuf):
                 # 1. update value network
                 # update usr vnet
+                self.vnet_optim.zero_grad()
                 v_usr_b = self.vnet(s_usr_b, 'usr').squeeze(-1)
                 loss_usr = self.l2_loss(v_usr_b, v_target_usr_b)
                 vnet_usr_loss += loss_usr.item()
@@ -631,7 +632,6 @@ class Learner():
                 loss_glo = self.l2_loss(v_glo_b, v_target_glo_b)
                 vnet_glo_loss += loss_glo.item()
 
-                self.vnet_optim.zero_grad()
                 loss = loss_usr + loss_sys + loss_glo
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(self.vnet.parameters(), self.grad_norm_clip)
@@ -676,7 +676,7 @@ class Learner():
             # 记录loss信息
             logging.debug('epoch {}, iteration {}, policy: usr {}, sys {}'.format
                           (epoch, i, policy_usr_loss, policy_sys_loss))
-            logging.debug('epoch {}, iteration {}, value: usr {}, sys {}, global {}'.format
+            logging.debug('epoch {}, iteration {}, vnet: usr {}, sys {}, global {}'.format
                           (epoch, i, vnet_usr_loss, vnet_sys_loss, vnet_glo_loss))
             self.writer.add_scalar('train/usr_policy_loss', policy_usr_loss, epoch)
             self.writer.add_scalar('train/sys_policy_loss', policy_sys_loss, epoch)
@@ -689,8 +689,8 @@ class Learner():
             self.save(self.save_dir, epoch)
             with open(self.save_dir + '/' + str(epoch) + '.pkl', 'wb') as f:
                 pickle.dump(best, f)
-        self.policy_usr.eval()
         self.policy_sys.eval()
+        self.policy_usr.eval()
         self.vnet.eval()
 
     """
