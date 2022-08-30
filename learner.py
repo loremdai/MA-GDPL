@@ -532,13 +532,11 @@ class Learner():
         s_sys = torch.from_numpy(np.stack(batch.state_sys)).to(device=DEVICE)
         a_sys = torch.from_numpy(np.stack(batch.action_sys)).to(device=DEVICE)
         s_sys_next = torch.from_numpy(np.stack(batch.state_sys_next)).to(device=DEVICE)
-        # r_sys = torch.Tensor(np.stack(batch.reward_sys)).to(device=DEVICE)
         batchsz_sys = s_sys.size(0)
 
         s_usr = torch.from_numpy(np.stack(batch.state_usr)).to(device=DEVICE)
         a_usr = torch.from_numpy(np.stack(batch.action_usr)).to(device=DEVICE)
         s_usr_next = torch.from_numpy(np.stack(batch.state_usr_next)).to(device=DEVICE)
-        # r_usr = torch.Tensor(np.stack(batch.reward_usr)).to(device=DEVICE)
         batchsz_usr = s_usr.size(0)
 
         ternimal = torch.Tensor(np.stack(batch.mask)).to(device=DEVICE)
@@ -568,8 +566,8 @@ class Learner():
         v_glo = self.vnet((s_usr, s_sys), 'global').squeeze(-1).detach()
 
         A_sys, v_target_sys = self.est_adv(r_sys, v_sys, ternimal)
-        A_usr = r_usr + self.gamma * (1 - ternimal) * self.vnet(s_usr_next, 'usr').detach() - self.vnet(s_usr, 'usr').detach()
-        _, v_target_usr = self.est_adv(r_usr, v_usr, ternimal)
+        #A_usr = r_usr + self.gamma * (1 - ternimal) * self.vnet(s_usr_next, 'usr').detach() - self.vnet(s_usr, 'usr').detach()
+        A_usr, v_target_usr = self.est_adv(r_usr, v_usr, ternimal)
         A_glo, v_target_glo = self.est_adv(r_glo, v_glo, ternimal)
 
         if not backward:
