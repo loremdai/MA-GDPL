@@ -567,7 +567,7 @@ class Learner():
 
         A_sys, v_target_sys = self.est_adv(r_sys, v_sys, ternimal)
         A_usr = r_usr + self.gamma * (1 - ternimal) * self.vnet(s_usr_next, 'usr').detach() - self.vnet(s_usr, 'usr').detach()
-        #A_usr, v_target_usr = self.est_adv(r_usr, v_usr, ternimal)
+        _, v_target_usr = self.est_adv(r_usr, v_usr, ternimal)
         A_glo, v_target_glo = self.est_adv(r_glo, v_glo, ternimal)
 
         if not backward:
