@@ -647,8 +647,6 @@ class Learner():
                 ratio_usr = (log_pi_sa_usr - log_pi_old_sa_usr_b).exp().squeeze(-1)  # [b, 1] => [b]
                 surrogate1_usr = ratio_usr * (A_usr_b + A_glo_b)
                 surrogate2_usr = torch.clamp(ratio_usr, 1 - self.epsilon, 1 + self.epsilon) * (A_usr_b + A_glo_b)
-                # this is element-wise comparing.
-                # we add negative symbol to convert gradient ascent to gradient descent
                 surrogate_usr = - torch.min(surrogate1_usr, surrogate2_usr).mean()
                 policy_usr_loss += surrogate_usr.item()
 
