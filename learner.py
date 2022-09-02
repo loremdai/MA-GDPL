@@ -786,6 +786,16 @@ class Learner():
             # unknown, sys_reward_loss, usr_reward_loss, total_reward
             best = [float('inf'), float('inf'), float('inf'), float('-inf')]
 
-        print("best:")
-        print(best)
         return best
+
+    def load_policy(self, filename):
+        directory, epoch = filename.rsplit('/', 1)
+        policy_sys_mdl = directory + '/sys/' + epoch + '_pol.mdl'
+        if os.path.exists(policy_sys_mdl):
+            self.policy_sys.load_state_dict(torch.load(policy_sys_mdl))
+            logging.info('<<dialog policy sys>> loaded checkpoint from file: {}'.format(policy_sys_mdl))
+
+        policy_usr_mdl = directory + '/usr/' + epoch + '_pol.mdl'
+        if os.path.exists(policy_usr_mdl):
+            self.policy_usr.load_state_dict(torch.load(policy_usr_mdl))
+            logging.info('<<dialog policy usr>> loaded checkpoint from file: {}'.format(policy_usr_mdl))
