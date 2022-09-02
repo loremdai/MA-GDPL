@@ -36,11 +36,6 @@ def sampler(pid, queue, evt, env, policy_usr, policy_sys, batchsz):
     """
     buff = Memory()
 
-    # we need to sample batchsz of (state, action, next_state, reward, mask)
-    # each trajectory contains `trajectory_len` num of items, so we only need to sample
-    # `batchsz//trajectory_len` num of trajectory totally
-    # the final sampled number may be larger than batchsz.
-
     sampled_num = 0
     sampled_traj_num = 0
     traj_len = 40
@@ -77,8 +72,6 @@ def sampler(pid, queue, evt, env, policy_usr, policy_sys, batchsz):
                 next_s_vec_next = torch.Tensor(state_vectorize(next_s_next, env.cfg, env.db))
                 env.set_rollout(False)
 
-                r_usr = 20 if env.evaluator.inform_F1(ansbysys=False)[1] == 1. else -5
-                r_sys = 20 if env.evaluator.task_success(False) else -5
                 r_global = 20 if env.evaluator.task_success() else -5
             else:
                 # one step roll out
@@ -90,37 +83,12 @@ def sampler(pid, queue, evt, env, policy_usr, policy_sys, batchsz):
                 next_s_vec_next = torch.Tensor(state_vectorize(next_s_next, env.cfg, env.db))
                 env.set_rollout(False)
 
-                r_usr = 0
-                if not s['user_action']:
-                    r_usr -= 5
-                if env.evaluator.cur_domain:
-                    for da in s['user_action']:
-                        d, i, k = da.split('-')
-                        if i == 'request':
-                            for slot, value in s['goal_state'][d].items():
-                                if value != '?' and slot in s['user_goal'][d] \
-                                        and s['user_goal'][d][slot] != '?':
-                                    # request before express constraint
-                                    r_usr -= 1
-                r_sys = 0
-                if not next_s['sys_action']:
-                    r_sys -= 5
-                if env.evaluator.cur_domain:
-                    for slot, value in next_s['belief_state'][env.evaluator.cur_domain].items():
-                        if value == '?':
-                            for da in next_s['sys_action']:
-                                d, i, k, p = da.split('-')
-                                if i in ['inform', 'recommend', 'offerbook', 'offerbooked'] and k == slot:
-                                    break
-                            else:
-                                # not answer request
-                                r_sys -= 1
                 r_global = 5 if env.evaluator.cur_domain and env.evaluator.domain_success(
                     env.evaluator.cur_domain) else -1
 
             # save to queue
             # s^u, a^u, r^u, s'^u, s^s, a^s, r^s, s'^s, t, r_glo
-            buff.push(s_vec.numpy(), a.numpy(), r_usr, s_vec_next.numpy(), next_s_vec.numpy(), next_a.numpy(), r_sys,
+            buff.push(s_vec.numpy(), a.numpy(), s_vec_next.numpy(), next_s_vec.numpy(), next_a.numpy(),
                       next_s_vec_next.numpy(), done, r_global)
 
             # update per step
@@ -149,17 +117,16 @@ class Learner():
         self.rewarder_usr = RewardEstimator(args, cfg, manager, character='usr', pretrain=pre_irl, inference=infer)
         self.vnet = HybridValue(cfg).to(device=DEVICE)
 
-        # initialize envs for each process
-        self.env_list = []
-        for _ in range(process_num):
-            self.env_list.append(env_cls(args.data_dir, cfg))
-
         self.policy_sys.eval()
         self.policy_usr.eval()
         self.vnet.eval()
         self.infer = infer
-
         if not infer:
+            self.target_vnet = HybridValue(cfg).to(device=DEVICE)
+            self.episode_num = 0
+            self.last_target_update_episode = 0
+            self.target_update_interval = args.interval
+
             self.l2_loss = nn.MSELoss()
             self.multi_entropy_loss = nn.BCEWithLogitsLoss()
 
@@ -167,11 +134,15 @@ class Learner():
             self.policy_usr_optim = optim.RMSprop(self.policy_usr.parameters(), lr=args.lr_policy)
             self.vnet_optim = optim.RMSprop(self.vnet.parameters(), lr=args.lr_vnet, weight_decay=args.weight_decay)
 
+        # initialize envs for each process
+        self.env_list = []
+        for _ in range(process_num):
+            self.env_list.append(env_cls(args.data_dir, cfg))
+
         self.gamma = args.gamma
         self.tau = args.tau  # GAE广义优势估计超参数lambda（此处用tau）
         self.epsilon = args.epsilon
         self.update_round = args.update_round  # Epoch num for inner loop of PPO
-
         self.grad_norm_clip = args.clip
         self.optim_batchsz = args.batchsz
         self.save_per_epoch = args.save_per_epoch
@@ -460,6 +431,10 @@ class Learner():
     """
 
     # 计算价值函数V和优势函数A
+    def _update_targets(self):
+        self.target_vnet.load_state_dict(self.vnet.state_dict())
+        logging.info('Updated target network')
+
     def est_adv(self, r, v, mask):
         """
         we save a trajectory in continuous space and it reaches the ending of current trajectory when mask=0.
@@ -542,7 +517,6 @@ class Learner():
         ternimal = torch.Tensor(np.stack(batch.mask)).to(device=DEVICE)
         r_glo = torch.Tensor(np.stack(batch.reward_global)).to(device=DEVICE)
 
-
         # 2. update reward estimator
         inputs_sys = (s_sys, a_sys, s_sys_next)
         inputs_usr = (s_usr, a_usr, s_usr_next)
@@ -565,10 +539,19 @@ class Learner():
         v_usr = self.vnet(s_usr, 'usr').squeeze(-1).detach()
         v_glo = self.vnet((s_usr, s_sys), 'global').squeeze(-1).detach()
 
-        A_sys, v_target_sys = self.est_adv(r_sys, v_sys, ternimal)
-        A_usr = r_usr + self.gamma * (1 - ternimal) * self.vnet(s_usr_next, 'usr').detach() - self.vnet(s_usr, 'usr').detach()
-        _, v_target_usr = self.est_adv(r_usr, v_usr, ternimal)
-        A_glo, v_target_glo = self.est_adv(r_glo, v_glo, ternimal)
+        A_sys = r_sys + self.gamma * (1 - ternimal) * self.vnet(s_sys_next, 'sys').detach() - self.vnet(s_sys,
+                                                                                                        'sys').detach()
+        v_target_sys = r_sys + self.gamma * (1 - ternimal) * self.target_vnet(s_sys_next, 'sys').detach()
+
+        A_usr = r_usr + self.gamma * (1 - ternimal) * self.vnet(s_usr_next, 'usr').detach() - self.vnet(s_usr,
+                                                                                                        'usr').detach()
+        v_target_usr = r_usr + self.gamma * (1 - ternimal) * self.target_vnet(s_usr_next, 'usr').detach()
+
+        A_glo = r_glo + self.gamma * (1 - ternimal) * self.vnet((s_usr_next, s_sys_next),
+                                                                'global').detach() - self.vnet((s_usr, s_sys),
+                                                                                               'global').detach()
+        v_target_glo = r_glo + self.gamma * (1 - ternimal) * self.target_vnet((s_usr_next, s_sys_next),
+                                                                              'global').detach()
 
         if not backward:
             reward = r_sys.mean().item() + r_usr.mean().item() + r_glo.mean().item()
@@ -618,26 +601,31 @@ class Learner():
                         v_target_sys_shuf, A_sys_shuf, s_sys_shuf, a_sys_shuf, log_pi_old_sa_sys_shuf,
                         v_target_glo_shuf, A_glo_shuf, r_glo_shuf):
                 # 1. update value network
-                # update usr vnet
-                self.vnet_optim.zero_grad()
-                v_usr_b = self.vnet(s_usr_b, 'usr').squeeze(-1)
-                loss_usr = (v_usr_b - v_target_usr_b).pow(2).mean()
-                vnet_usr_loss += loss_usr.item()
-
                 # update sys vnet
-                v_sys_b = self.vnet(s_sys_b, 'sys').squeeze(-1)
-                loss_sys = (v_sys_b - v_target_sys_b).pow(2).mean()
+                v_sys_b = self.vnet(s_sys_b, 'sys')
+                loss_sys = self.l2_loss(v_sys_b, v_target_sys_b)
                 vnet_sys_loss += loss_sys.item()
 
+                # update usr vnet
+                v_usr_b = self.vnet(s_usr_b, 'usr')
+                loss_usr = self.l2_loss(v_usr_b, v_target_usr_b)
+                vnet_usr_loss += loss_usr.item()
+
                 # update global vnet
-                v_glo_b = self.vnet((s_usr_b, s_sys_b), 'global').squeeze(-1)
-                loss_glo = (v_glo_b - v_target_glo_b).pow(2).mean()
+                v_glo_b = self.vnet((s_usr_b, s_sys_b), 'global')
+                loss_glo = self.l2_loss(v_glo_b, v_target_glo_b)
                 vnet_glo_loss += loss_glo.item()
 
+                self.vnet_optim.zero_grad()
                 loss = loss_usr + loss_sys + loss_glo
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(self.vnet.parameters(), self.grad_norm_clip)
                 self.vnet_optim.step()
+
+                self.episode_num += 1
+                if (self.episode_num - self.last_target_update_episode) / self.target_update_interval >= 1.0:
+                    self._update_targets()
+                    self.last_target_update_episode = self.episode_num
 
                 # 2. update policy by PPO
                 # update sys policy
@@ -778,6 +766,9 @@ class Learner():
             self.policy_usr.load_state_dict(torch.load(policy_usr_mdl))
             logging.info('<<dialog policy usr>> loaded checkpoint from file: {}'.format(policy_usr_mdl))
 
+        if not self.infer:
+            self._update_targets()
+
         best_pkl = filename + '.pkl'
         if os.path.exists(best_pkl):
             with open(best_pkl, 'rb') as f:
@@ -787,14 +778,3 @@ class Learner():
             best = [float('inf'), float('inf'), float('inf'), float('-inf')]
 
         return best
-
-    def load_policy(self, filename):
-        policy_sys_mdl = filename + '/sys/' + 'best' + '_pol.mdl'
-        if os.path.exists(policy_sys_mdl):
-            self.policy_sys.load_state_dict(torch.load(policy_sys_mdl))
-            logging.info('<<dialog policy sys>> loaded checkpoint from file: {}'.format(policy_sys_mdl))
-
-        policy_usr_mdl = filename + '/usr/' + 'best' + '_pol.mdl'
-        if os.path.exists(policy_usr_mdl):
-            self.policy_usr.load_state_dict(torch.load(policy_usr_mdl))
-            logging.info('<<dialog policy usr>> loaded checkpoint from file: {}'.format(policy_usr_mdl))
