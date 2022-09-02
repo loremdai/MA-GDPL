@@ -102,10 +102,6 @@ if __name__ == '__main__':
         # for p in processes:
         #     p.join()
 
-        # 直接载入训练好的sys和usr：
-        agent = Learner(make_env, args, config, args.process, manager)
-        agent.load_policy('model_pre')
-
         # 预训练RE：
         worker_estimator(args, manager, config, make_env)
 
