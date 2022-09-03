@@ -43,10 +43,10 @@ def worker_estimator(args, manager, config, make_env):
     agent = Learner(make_env, args, config, args.process, manager, pre_irl=True)
     agent.load(args.save_dir+'/best')
     best0, best1, best2 = float('inf'), float('inf'), float('inf')
-    for e in range(100):
+    for e in range(200):
         agent.train_irl(e, args.batchsz_traj)
         best0, best1 = agent.test_irl(e, args.batchsz, best0, best1)
-        #best2 = agent.imit_value(e, args.batchsz_traj, best2)
+        best2 = agent.imit_value(e, args.batchsz_traj, best2)
 
 """
 环境区
