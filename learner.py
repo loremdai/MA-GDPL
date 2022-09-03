@@ -157,17 +157,16 @@ class Learner():
     # 预训练RE（逆强化学习）
     def train_irl(self, epoch, batchsz):
         batch = self.sample(batchsz)
-        #self.rewarder_sys.train_irl(batch, epoch)
+        self.rewarder_sys.train_irl(batch, epoch)
         self.rewarder_usr.train_irl(batch, epoch)
 
     # 测试RE
     def test_irl(self, epoch, batchsz, best0, best1):
         batch = self.sample(batchsz)
-        #best_sys = self.rewarder_sys.test_irl(batch, epoch, best0)  # best = float('inf')
+        best_sys = self.rewarder_sys.test_irl(batch, epoch, best0)  # best = float('inf')
         best_usr = self.rewarder_usr.test_irl(batch, epoch, best1)
 
-        #return best_sys, best_usr
-        return best_usr
+        return best_sys, best_usr
 
     # 预训练价值网络
     def imit_value(self, epoch, batchsz, best):
@@ -502,9 +501,6 @@ class Learner():
         # 1. sample data asynchronously
         batch = self.sample(batchsz)
 
-        # data in batch is : batch.state: ([1, s_dim], [1, s_dim]...)
-        # batch.action: ([1, a_dim], [1, a_dim]...)
-        # batch.reward/batch.mask: ([1], [1]...)
         s_sys = torch.from_numpy(np.stack(batch.state_sys)).to(device=DEVICE)
         a_sys = torch.from_numpy(np.stack(batch.action_sys)).to(device=DEVICE)
         s_sys_next = torch.from_numpy(np.stack(batch.state_sys_next)).to(device=DEVICE)
@@ -553,7 +549,6 @@ class Learner():
                                                                                                'global').detach()
         v_target_glo = r_glo + self.gamma * (1 - ternimal) * self.target_vnet((s_usr_next, s_sys_next),
                                                                               'global').detach()
-
         if not backward:
             reward = r_sys.mean().item() + r_usr.mean().item() + r_glo.mean().item()
             logging.debug('validation, epoch {}, reward {}'.format(epoch, reward))

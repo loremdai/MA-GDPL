@@ -45,7 +45,7 @@ def worker_estimator(args, manager, config, make_env):
     best0, best1, best2 = float('inf'), float('inf'), float('inf')
     for e in range(args.epoch):
         agent.train_irl(e, args.batchsz_traj)
-        best1 = agent.test_irl(e, args.batchsz, best0, best1)
+        best0, best1 = agent.test_irl(e, args.batchsz, best0, best1)
         best2 = agent.imit_value(e, args.batchsz_traj, best2)
 
 """
