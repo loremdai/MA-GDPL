@@ -176,31 +176,27 @@ class Learner():
         s_sys = torch.from_numpy(np.stack(batch.state_sys)).to(device=DEVICE)
         a_sys = torch.from_numpy(np.stack(batch.action_sys)).to(device=DEVICE)
         next_s_sys = torch.from_numpy(np.stack(batch.state_sys_next)).to(device=DEVICE)
-        batchsz_sys = s_sys.size(0)
 
         s_usr = torch.from_numpy(np.stack(batch.state_usr)).to(device=DEVICE)
         a_usr = torch.from_numpy(np.stack(batch.action_usr)).to(device=DEVICE)
         next_s_usr = torch.from_numpy(np.stack(batch.state_usr_next)).to(device=DEVICE)
-        batchsz_usr = s_usr.size(0)
 
         r_glo = torch.Tensor(np.stack(batch.reward_global)).to(device=DEVICE)
-        mask = torch.Tensor(np.stack(batch.mask)).to(device=DEVICE)
+        ternimal = torch.Tensor(np.stack(batch.mask)).to(device=DEVICE)
 
         # sys part
-        v_sys = self.vnet(s_sys, 'sys').squeeze(-1).detach()
         log_pi_old_sa_sys = self.policy_sys.get_log_prob(s_sys, a_sys).detach()
         r_sys = self.rewarder_sys.estimate(s_sys, a_sys, next_s_sys, log_pi_old_sa_sys).detach()
-        A_sys, v_target_sys = self.est_adv(r_sys, v_sys, mask)
+        v_target_sys = r_sys + self.gamma * (1 - ternimal) * self.target_vnet(next_s_sys, 'sys').detach()
 
         # usr part
-        v_usr = self.vnet(s_usr, 'usr').squeeze(-1).detach()
         log_pi_old_sa_usr = self.policy_usr.get_log_prob(s_usr, a_usr).detach()
         r_usr = self.rewarder_usr.estimate(s_usr, a_usr, next_s_usr, log_pi_old_sa_usr).detach()
-        A_usr, v_target_usr = self.est_adv(r_usr, v_usr, mask)
+        v_target_usr = r_usr + self.gamma * (1 - ternimal) * self.target_vnet(next_s_usr, 'usr').detach()
 
         # glo part
-        v_glo = self.vnet((s_usr, s_sys), 'global').squeeze(-1).detach()
-        A_glo, v_target_glo = self.est_adv(r_glo, v_glo, mask)
+        v_target_glo = r_glo + self.gamma * (1 - ternimal) * self.target_vnet((next_s_usr, next_s_sys),
+                                                                              'global').detach()
 
         for i in range(self.update_round):
             perm = torch.randperm(batchsz)
@@ -231,7 +227,6 @@ class Learner():
                 # update vnet sys
                 v_sys_b = self.vnet(s_sys_b, 'sys').squeeze(-1)
                 loss_sys = self.l2_loss(v_sys_b, v_target_sys_b)
-                # loss = (v_b - v_target_b).pow(2).mean()
                 vnet_sys_loss += loss_sys.item()
 
                 # update vnet usr
@@ -531,11 +526,7 @@ class Learner():
         r_sys = self.rewarder_sys.estimate(s_sys, a_sys, s_sys_next, log_pi_old_sa_sys).detach()
         r_usr = self.rewarder_usr.estimate(s_usr, a_usr, s_usr_next, log_pi_old_sa_usr).detach()
 
-        # 4. estimate V, A and V_td-target
-        v_sys = self.vnet(s_sys, 'sys').squeeze(-1).detach()
-        v_usr = self.vnet(s_usr, 'usr').squeeze(-1).detach()
-        v_glo = self.vnet((s_usr, s_sys), 'global').squeeze(-1).detach()
-
+        # 4. estimate A and V_td-target
         A_sys = r_sys + self.gamma * (1 - ternimal) * self.vnet(s_sys_next, 'sys').detach() - self.vnet(s_sys,
                                                                                                         'sys').detach()
         v_target_sys = r_sys + self.gamma * (1 - ternimal) * self.target_vnet(s_sys_next, 'sys').detach()
