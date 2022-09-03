@@ -157,16 +157,17 @@ class Learner():
     # 预训练RE（逆强化学习）
     def train_irl(self, epoch, batchsz):
         batch = self.sample(batchsz)
-        self.rewarder_sys.train_irl(batch, epoch)
+        #self.rewarder_sys.train_irl(batch, epoch)
         self.rewarder_usr.train_irl(batch, epoch)
 
     # 测试RE
     def test_irl(self, epoch, batchsz, best0, best1):
         batch = self.sample(batchsz)
-        best_sys = self.rewarder_sys.test_irl(batch, epoch, best0)  # best = float('inf')
+        #best_sys = self.rewarder_sys.test_irl(batch, epoch, best0)  # best = float('inf')
         best_usr = self.rewarder_usr.test_irl(batch, epoch, best1)
 
-        return best_sys, best_usr
+        #return best_sys, best_usr
+        return best_usr
 
     # 预训练价值网络
     def imit_value(self, epoch, batchsz, best):
