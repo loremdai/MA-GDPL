@@ -615,37 +615,32 @@ class Learner():
                     self.last_target_update_episode = self.episode_num
 
                 # 2. update policy by PPO
-                self.policy_usr_optim.zero_grad()
-                # [b, 1]
-                log_pi_sa = self.policy_usr.get_log_prob(s_usr_b, a_usr_b)
-                # this is element-wise comparing.
-                # we add negative symbol to convert gradient ascent to gradient descent
-                surrogate = - (log_pi_sa * (A_usr_b + A_glo_b)).mean()
-                policy_usr_loss += surrogate.item()
-
-                # backprop
-                surrogate.backward(retain_graph=True)
-                # gradient clipping, for stability
-                torch.nn.utils.clip_grad_norm(self.policy_usr.parameters(), self.grad_norm_clip)
-                # self.lock.acquire() # retain lock to update weights
-                self.policy_usr_optim.step()
-                # self.lock.release() # release lock
-
+                # update sys policy
                 self.policy_sys_optim.zero_grad()
-                # [b, 1]
-                log_pi_sa = self.policy_sys.get_log_prob(s_sys_b, a_sys_b)
-                # this is element-wise comparing.
-                # we add negative symbol to convert gradient ascent to gradient descent
-                surrogate = - (log_pi_sa * (A_sys_b + A_glo_b)).mean()
-                policy_sys_loss += surrogate.item()
+                log_pi_sa_sys = self.policy_sys.get_log_prob(s_sys_b, a_sys_b)
+                ratio_sys = (log_pi_sa_sys - log_pi_old_sa_sys_b).exp().squeeze(-1)
+                surrogate1_sys = ratio_sys * (A_sys_b + A_glo_b)
+                surrogate2_sys = torch.clamp(ratio_sys, 1 - self.epsilon, 1 + self.epsilon) * (A_sys_b + A_glo_b)
+                surrogate_sys = - torch.min(surrogate1_sys, surrogate2_sys).mean()
+                policy_sys_loss += surrogate_sys.item()
 
-                # backprop
-                surrogate.backward()
-                # gradient clipping, for stability
+                surrogate_sys.backward()
                 torch.nn.utils.clip_grad_norm(self.policy_sys.parameters(), self.grad_norm_clip)
-                # self.lock.acquire() # retain lock to update weights
                 self.policy_sys_optim.step()
-                # self.lock.release() # release loc
+
+                # update usr policy
+                self.policy_usr_optim.zero_grad()
+                log_pi_sa_usr = self.policy_usr.get_log_prob(s_usr_b, a_usr_b)  # [b, 1]
+                ratio_usr = (log_pi_sa_usr - log_pi_old_sa_usr_b).exp().squeeze(-1)  # [b, 1] => [b]
+                surrogate1_usr = ratio_usr * (A_usr_b + A_glo_b)
+                surrogate2_usr = torch.clamp(ratio_usr, 1 - self.epsilon, 1 + self.epsilon) * (A_usr_b + A_glo_b)
+                surrogate_usr = - torch.min(surrogate1_usr, surrogate2_usr).mean()
+                policy_usr_loss += surrogate_usr.item()
+
+                surrogate_usr.backward()  # backprop
+                torch.nn.utils.clip_grad_norm(self.policy_usr.parameters(),
+                                              self.grad_norm_clip)  # gradient clipping, for stability
+                self.policy_usr_optim.step()
 
             vnet_usr_loss /= optim_chunk_num
             vnet_sys_loss /= optim_chunk_num
