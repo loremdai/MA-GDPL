@@ -499,13 +499,11 @@ class Learner():
         s_sys = torch.from_numpy(np.stack(batch.state_sys)).to(device=DEVICE)
         a_sys = torch.from_numpy(np.stack(batch.action_sys)).to(device=DEVICE)
         s_sys_next = torch.from_numpy(np.stack(batch.state_sys_next)).to(device=DEVICE)
-        r_sys = torch.Tensor(np.stack(batch.reward_sys)).to(device=DEVICE)
         batchsz_sys = s_sys.size(0)
 
         s_usr = torch.from_numpy(np.stack(batch.state_usr)).to(device=DEVICE)
         a_usr = torch.from_numpy(np.stack(batch.action_usr)).to(device=DEVICE)
         s_usr_next = torch.from_numpy(np.stack(batch.state_usr_next)).to(device=DEVICE)
-        r_usr = torch.Tensor(np.stack(batch.reward_usr)).to(device=DEVICE)
         batchsz_usr = s_usr.size(0)
 
         ternimal = torch.Tensor(np.stack(batch.mask)).to(device=DEVICE)
@@ -525,8 +523,8 @@ class Learner():
         log_pi_old_sa_sys = self.policy_sys.get_log_prob(s_sys, a_sys).detach()
         log_pi_old_sa_usr = self.policy_usr.get_log_prob(s_usr, a_usr).detach()
 
-        # r_sys = self.rewarder_sys.estimate(s_sys, a_sys, s_sys_next, log_pi_old_sa_sys).detach()
-        # r_usr = self.rewarder_usr.estimate(s_usr, a_usr, s_usr_next, log_pi_old_sa_usr).detach()
+        r_sys = self.rewarder_sys.estimate(s_sys, a_sys, s_sys_next, log_pi_old_sa_sys).detach()
+        r_usr = self.rewarder_usr.estimate(s_usr, a_usr, s_usr_next, log_pi_old_sa_usr).detach()
 
         # 4. estimate A and V_td-target
         A_sys = r_sys + self.gamma * (1 - ternimal) * self.vnet(s_sys_next, 'sys').detach() - self.vnet(s_sys,

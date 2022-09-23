@@ -9,7 +9,7 @@ from utils import get_parser, init_logging_handler
 from torch import multiprocessing as mp
 
 from policy import Policy
-from learner_origin import Learner
+from learner import Learner
 
 from config import MultiWozConfig
 from controller import Controller
