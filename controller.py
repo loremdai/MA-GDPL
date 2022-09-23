@@ -7,7 +7,6 @@ from utils import init_goal, init_session
 from tracker import StateTracker
 from goal_generator import GoalGenerator
 
-
 class Controller(StateTracker):
     def __init__(self, data_dir, config):
         super(Controller, self).__init__(data_dir, config)

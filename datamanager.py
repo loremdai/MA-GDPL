@@ -495,7 +495,6 @@ class DataManager():
         return dataloader_sys, dataloader_usr, dataloader_global
 
 
-
 class Dataset_Policy(data.Dataset):
     def __init__(self, s, a):
         self.s = s
